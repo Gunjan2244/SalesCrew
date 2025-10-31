@@ -1,0 +1,404 @@
+{
+  "products": [
+    {
+      "id": 1,
+      "name": "Classic Denim Jacket",
+      "category": "Outerwear",
+      "description": "A timeless denim jacket perfect for layering across all seasons.",
+      "items": [
+        {
+          "item_id": "1A",
+          "variant": "Light Blue",
+          "price": 59.99,
+          "description": "Washed light blue denim with silver buttons and a relaxed fit."
+        },
+        {
+          "item_id": "1B",
+          "variant": "Black",
+          "price": 69.99,
+          "description": "Black denim finish with matte black hardware for an edgy look."
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "Slim Fit Chinos",
+      "category": "Bottomwear",
+      "description": "Comfortable cotton chinos suitable for both casual and semi-formal wear.",
+      "items": [
+        {
+          "item_id": "2A",
+          "variant": "Beige",
+          "price": 49.99,
+          "description": "Soft beige color with a stretchable fabric and ankle fit."
+        },
+        {
+          "item_id": "2B",
+          "variant": "Navy Blue",
+          "price": 54.99,
+          "description": "Deep navy chinos that pair well with casual shirts or polos."
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "name": "Printed Summer Dress",
+      "category": "Women",
+      "description": "Lightweight and breathable dress for warm days.",
+      "items": [
+        {
+          "item_id": "3A",
+          "variant": "Floral Red",
+          "price": 39.99,
+          "description": "Bright floral pattern with short sleeves and a flared hem."
+        },
+        {
+          "item_id": "3B",
+          "variant": "Sky Blue",
+          "price": 42.99,
+          "description": "Soft pastel blue with tiny white prints and a belted waist."
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "name": "Leather Boots",
+      "category": "Footwear",
+      "description": "Durable full-grain leather boots ideal for urban and rugged wear.",
+      "items": [
+        {
+          "item_id": "4A",
+          "variant": "Brown",
+          "price": 89.99,
+          "description": "Rich brown leather with lace-up closure and non-slip sole."
+        },
+        {
+          "item_id": "4B",
+          "variant": "Black",
+          "price": 94.99,
+          "description": "Smooth black finish with side zip and cushioned ankle padding."
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "name": "Cotton Graphic T-Shirt",
+      "category": "Tops",
+      "description": "100% cotton T-shirt featuring modern prints for casual outfits.",
+      "items": [
+        {
+          "item_id": "5A",
+          "variant": "White with Text Print",
+          "price": 24.99,
+          "description": "Minimalistic text print on white cotton for everyday wear."
+        },
+        {
+          "item_id": "5B",
+          "variant": "Black with Abstract Art",
+          "price": 26.99,
+          "description": "Abstract multicolor artwork on a jet-black background."
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "name": "Hooded Sweatshirt",
+      "category": "Winterwear",
+      "description": "Soft fleece-lined hoodie offering warmth and comfort.",
+      "items": [
+        {
+          "item_id": "6A",
+          "variant": "Charcoal Grey",
+          "price": 49.99,
+          "description": "Drawstring hood, kangaroo pocket, and ribbed cuffs."
+        },
+        {
+          "item_id": "6B",
+          "variant": "Olive Green",
+          "price": 54.99,
+          "description": "Earth-tone hoodie with brushed interior for extra softness."
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "name": "Pleated Midi Skirt",
+      "category": "Women",
+      "description": "Elegant pleated skirt suitable for both work and outings.",
+      "items": [
+        {
+          "item_id": "7A",
+          "variant": "Champagne",
+          "price": 59.99,
+          "description": "Silky texture with metallic sheen and elastic waistband."
+        },
+        {
+          "item_id": "7B",
+          "variant": "Navy",
+          "price": 64.99,
+          "description": "Classic navy tone with fine pleats and smooth drape."
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "name": "Running Sneakers",
+      "category": "Footwear",
+      "description": "Breathable and lightweight running shoes for all-day comfort.",
+      "items": [
+        {
+          "item_id": "8A",
+          "variant": "White & Blue",
+          "price": 79.99,
+          "description": "Mesh upper for ventilation and EVA sole for flexibility."
+        },
+        {
+          "item_id": "8B",
+          "variant": "Black & Red",
+          "price": 84.99,
+          "description": "Dynamic color combo with reinforced toe and heel."
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "name": "Wool Blend Scarf",
+      "category": "Accessories",
+      "description": "Soft and cozy scarf perfect for winter layering.",
+      "items": [
+        {
+          "item_id": "9A",
+          "variant": "Grey Plaid",
+          "price": 39.99,
+          "description": "Classic plaid design with fringe detailing at edges."
+        },
+        {
+          "item_id": "9B",
+          "variant": "Burgundy",
+          "price": 44.99,
+          "description": "Rich deep burgundy tone for a luxurious winter look."
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "name": "Casual Linen Shirt",
+      "category": "Tops",
+      "description": "Breathable linen shirt ideal for summer comfort.",
+      "items": [
+        {
+          "item_id": "10A",
+          "variant": "White",
+          "price": 29.99,
+          "description": "Classic white linen with wooden buttons and rolled sleeves."
+        },
+        {
+          "item_id": "10B",
+          "variant": "Sky Blue",
+          "price": 31.99,
+          "description": "Soft blue linen shirt with a tailored relaxed fit."
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "name": "Knitted Sweater",
+      "category": "Winterwear",
+      "description": "Cozy knitted sweater crafted from soft wool blend.",
+      "items": [
+        {
+          "item_id": "11A",
+          "variant": "Cream",
+          "price": 49.99,
+          "description": "Cable-knit design with ribbed hem and cuffs."
+        },
+        {
+          "item_id": "11B",
+          "variant": "Maroon",
+          "price": 52.99,
+          "description": "Deep maroon tone with soft-touch finish."
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "name": "Formal Blazer",
+      "category": "Men",
+      "description": "Tailored blazer offering a sharp, professional look.",
+      "items": [
+        {
+          "item_id": "12A",
+          "variant": "Navy Blue",
+          "price": 89.99,
+          "description": "Single-breasted design with two-button closure."
+        },
+        {
+          "item_id": "12B",
+          "variant": "Charcoal Grey",
+          "price": 94.99,
+          "description": "Slim-fit cut with notch lapels and side vents."
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "name": "Silk Evening Gown",
+      "category": "Women",
+      "description": "Elegant full-length gown perfect for formal occasions.",
+      "items": [
+        {
+          "item_id": "13A",
+          "variant": "Emerald Green",
+          "price": 129.99,
+          "description": "Satin silk texture with draped neckline and slit design."
+        },
+        {
+          "item_id": "13B",
+          "variant": "Royal Blue",
+          "price": 134.99,
+          "description": "Rich silk sheen with fitted waist and flowing hem."
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "name": "Cargo Joggers",
+      "category": "Bottomwear",
+      "description": "Relaxed joggers with multiple pockets for utility and style.",
+      "items": [
+        {
+          "item_id": "14A",
+          "variant": "Khaki",
+          "price": 49.99,
+          "description": "Adjustable drawstring waist and elastic cuffs."
+        },
+        {
+          "item_id": "14B",
+          "variant": "Olive Green",
+          "price": 54.99,
+          "description": "Lightweight cotton blend for comfort and mobility."
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "name": "High Heeled Sandals",
+      "category": "Footwear",
+      "description": "Stylish heels to complement evening and party looks.",
+      "items": [
+        {
+          "item_id": "15A",
+          "variant": "Gold",
+          "price": 39.99,
+          "description": "Metallic finish with ankle strap and cushioned sole."
+        },
+        {
+          "item_id": "15B",
+          "variant": "Silver",
+          "price": 42.99,
+          "description": "Shimmer silver tone with open-toe design."
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "name": "Classic Polo Shirt",
+      "category": "Men",
+      "description": "Cotton polo with ribbed collar and a clean finish.",
+      "items": [
+        {
+          "item_id": "16A",
+          "variant": "Navy",
+          "price": 29.99,
+          "description": "Timeless navy with embroidered logo on chest."
+        },
+        {
+          "item_id": "16B",
+          "variant": "White",
+          "price": 31.99,
+          "description": "Bright white cotton with breathable pique texture."
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "name": "Wool Overcoat",
+      "category": "Outerwear",
+      "description": "Premium wool blend overcoat for a sophisticated winter look.",
+      "items": [
+        {
+          "item_id": "17A",
+          "variant": "Camel Brown",
+          "price": 149.99,
+          "description": "Double-breasted design with deep pockets and notch collar."
+        },
+        {
+          "item_id": "17B",
+          "variant": "Black",
+          "price": 154.99,
+          "description": "Classic black tone for a versatile formal appearance."
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "name": "Athleisure Leggings",
+      "category": "Activewear",
+      "description": "Stretchable high-waist leggings for workouts or casual wear.",
+      "items": [
+        {
+          "item_id": "18A",
+          "variant": "Black",
+          "price": 49.99,
+          "description": "Moisture-wicking fabric with seamless comfort."
+        },
+        {
+          "item_id": "18B",
+          "variant": "Purple Ombre",
+          "price": 54.99,
+          "description": "Gradient purple finish with compression support."
+        }
+      ]
+    },
+    {
+      "id": 19,
+      "name": "Canvas Backpack",
+      "category": "Accessories",
+      "description": "Durable and trendy backpack for everyday use.",
+      "items": [
+        {
+          "item_id": "19A",
+          "variant": "Beige",
+          "price": 59.99,
+          "description": "Natural beige canvas with leather straps and inner compartments."
+        },
+        {
+          "item_id": "19B",
+          "variant": "Black",
+          "price": 64.99,
+          "description": "Water-resistant finish with padded laptop sleeve."
+        }
+      ]
+    },
+    {
+      "id": 20,
+      "name": "Classic Wristwatch",
+      "category": "Accessories",
+      "description": "Stylish wristwatch for both casual and formal settings.",
+      "items": [
+        {
+          "item_id": "20A",
+          "variant": "Leather Strap Brown",
+          "price": 79.99,
+          "description": "Analog watch with stainless steel case and brown leather strap."
+        },
+        {
+          "item_id": "20B",
+          "variant": "Metal Chain Silver",
+          "price": 84.99,
+          "description": "Sleek silver finish with minimalist dial design."
+        }
+      ]
+    }
+  ]
+}
