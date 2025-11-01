@@ -2,18 +2,51 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CrewAI Chatbot</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="/static/script.js" defer></script>
 </head>
-<body class="bg-slate-50 text-gray-800 flex flex-col items-center h-screen">
-  <div class="w-full max-w-2xl bg-white rounded-2xl shadow-lg mt-10 flex flex-col h-[80vh]">
-    <div id="chatbox" class="flex-1 overflow-y-auto p-4 space-y-3 text-sm"></div>
-    <div class="border-t p-3 flex gap-2">
-      <input id="userInput" type="text" placeholder="Type your message..." 
-             class="flex-1 border rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400" />
-      <button id="sendBtn" 
-              class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-xl transition">Send</button>
+<body class="bg-slate-50 text-gray-800 flex flex-col h-screen">
+  <!-- Header -->
+  <header class="bg-white shadow-sm border-b">
+    <div class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+      <div>
+        <h1 class="text-2xl font-bold text-gray-800">CrewAI Chatbot</h1>
+        <p class="text-sm text-gray-600">AI-Powered Shopping Assistant</p>
+      </div>
+      <div class="flex items-center gap-4">
+        <span id="userInfo" class="text-sm text-gray-600 font-medium"></span>
+        <button id="logoutBtn" 
+                class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition text-sm font-medium">
+          Logout
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Chat Container -->
+  <div class="flex-1 flex items-center justify-center p-4">
+    <div class="w-full max-w-4xl bg-white rounded-2xl shadow-lg flex flex-col h-[calc(100vh-140px)]">
+      <!-- Chat Messages -->
+      <div id="chatbox" class="flex-1 overflow-y-auto p-6 space-y-3 text-sm"></div>
+      
+      <!-- Input Area -->
+      <div class="border-t p-4 bg-gray-50 rounded-b-2xl">
+        <div class="flex gap-3">
+          <input id="userInput" 
+                 type="text" 
+                 placeholder="Type your message..." 
+                 class="flex-1 border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+          <button id="sendBtn" 
+                  class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-xl transition font-medium shadow-md hover:shadow-lg">
+            Send
+          </button>
+        </div>
+        <p class="text-xs text-gray-500 mt-2 text-center">
+          Powered by CrewAI • Type 'exit' to save and close session
+        </p>
+      </div>
     </div>
   </div>
 </body>
