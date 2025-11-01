@@ -4,7 +4,7 @@ import os
 import json
 import datetime
 import google.generativeai as genai
-from typing import List, Dict
+from typing import List, Dict, Tuple
 import numpy as np
 
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
@@ -15,70 +15,149 @@ llm = LLM(
     api_key=os.getenv("GOOGLE_API_KEY")
 )
 
-class ProductRAG:
-    """RAG system for product recommendations"""
+class ProductRAGWithEmbeddings:
+    """Proper RAG system using embeddings and cosine similarity"""
     
     def __init__(self, products_json_path: str = "rproducts.json"):
         self.products = self._load_products(products_json_path)
-        self.genai_model = genai.GenerativeModel('gemini-2.5-flash-lite')
+        self.product_embeddings = None
+        self.embeddings_generated = False
         
     def _load_products(self, path: str) -> List[Dict]:
         """Load products from JSON file"""
         try:
             with open(path, 'r') as f:
                 data = json.load(f)
-                # Handle both list and dict formats
                 if isinstance(data, list):
                     return data
                 elif isinstance(data, dict) and 'products' in data:
                     return data['products']
                 else:
-                    return [data]  # Single product object
+                    return [data]
         except FileNotFoundError:
             print(f"Warning: {path} not found. Using empty product list.")
             return []
     
+    def _prepare_product_text(self, product: Dict) -> str:
+        """Convert product dict to searchable text for embedding"""
+        name = product.get('name') or product.get('title', 'Unknown')
+        category = product.get('category') or product.get('type', '')
+        description = product.get('description', '')
+        price = str(product.get('price', ''))
+        features = product.get('features', '')
+        
+        text = f"{name} {category} {description} {features} {price}"
+        return text.strip()
+    
+    def generate_embeddings(self):
+        """
+        ONE-TIME PREPROCESSING: Generate embeddings for all products
+        Call this once when initializing the system
+        """
+        if self.embeddings_generated:
+            print("✓ Embeddings already generated")
+            return
+        
+        if not self.products:
+            print("⚠ No products to embed")
+            return
+        
+        print(f"🔄 Generating embeddings for {len(self.products)} products...")
+        
+        embeddings_list = []
+        
+        for i, product in enumerate(self.products):
+            product_text = self._prepare_product_text(product)
+            
+            result = genai.embed_content(
+                model="models/text-embedding-004",
+                content=product_text,
+                task_type="retrieval_document"
+            )
+            
+            embeddings_list.append(result['embedding'])
+            
+            if (i + 1) % 50 == 0 or (i + 1) == len(self.products):
+                print(f"  Progress: {i + 1}/{len(self.products)} products")
+        
+        self.product_embeddings = np.array(embeddings_list)
+        self.embeddings_generated = True
+        
+        print(f"✓ Embeddings generated: {self.product_embeddings.shape}")
+    
+    def cosine_similarity(self, vec1: np.ndarray, vec2: np.ndarray) -> float:
+        """Calculate cosine similarity between two vectors"""
+        dot_product = np.dot(vec1, vec2)
+        magnitude1 = np.linalg.norm(vec1)
+        magnitude2 = np.linalg.norm(vec2)
+        
+        if magnitude1 == 0 or magnitude2 == 0:
+            return 0.0
+        
+        return dot_product / (magnitude1 * magnitude2)
+    
     def search_products(self, query: str, top_k: int = 5) -> List[Dict]:
         """
-        Search products using semantic similarity with Gemini embeddings
-        Falls back to keyword search if embedding fails
+        Search products using embedding similarity
+        Returns: List of relevant products (without scores for backward compatibility)
         """
+        if not self.embeddings_generated:
+            print("⚠ Embeddings not generated yet! Using fallback search.")
+            return self._keyword_search(query, top_k)
+        
         if not self.products:
             return []
         
-        try:
-            # Use Gemini to find relevant products
-            product_context = self._format_products_for_context(self.products[:50])  # Limit context size
-            
-            search_prompt = f"""
-Given these products:
-{product_context}
-
-User query: {query}
-
-Return the {top_k} most relevant product names that match this query.
-Consider: category, price range, features, and user intent.
-Return ONLY a JSON array of product names, nothing else.
-Example: ["Product A", "Product B", "Product C"]
-"""
-            
-            response = self.genai_model.generate_content(search_prompt)
-            product_names = json.loads(response.text.strip())
-            
-            # Get full product details
-            relevant_products = [
-                p for p in self.products 
-                if p.get('name') in product_names or p.get('title') in product_names
-            ]
-            
-            return relevant_products[:top_k]
-            
-        except Exception as e:
-            print(f"Semantic search failed: {e}. Falling back to keyword search.")
-            return self._keyword_search(query, top_k)
+        # Generate query embedding
+        result = genai.embed_content(
+            model="models/text-embedding-004",
+            content=query,
+            task_type="retrieval_query"
+        )
+        query_embedding = np.array(result['embedding'])
+        
+        # Calculate similarities with all products
+        similarities = []
+        for i, product_emb in enumerate(self.product_embeddings):
+            similarity_score = self.cosine_similarity(query_embedding, product_emb)
+            similarities.append((i, similarity_score))
+        
+        # Sort by similarity (highest first)
+        similarities.sort(key=lambda x: x[1], reverse=True)
+        
+        # Return top-k products
+        top_results = [self.products[i] for i, score in similarities[:top_k]]
+        return top_results
+    
+    def search_products_with_scores(self, query: str, top_k: int = 5) -> List[Tuple[Dict, float]]:
+        """
+        Search products and return with similarity scores
+        Useful for debugging or showing confidence
+        """
+        if not self.embeddings_generated:
+            return [(p, 0.0) for p in self._keyword_search(query, top_k)]
+        
+        if not self.products:
+            return []
+        
+        result = genai.embed_content(
+            model="models/text-embedding-004",
+            content=query,
+            task_type="retrieval_query"
+        )
+        query_embedding = np.array(result['embedding'])
+        
+        similarities = []
+        for i, product_emb in enumerate(self.product_embeddings):
+            similarity_score = self.cosine_similarity(query_embedding, product_emb)
+            similarities.append((i, similarity_score))
+        
+        similarities.sort(key=lambda x: x[1], reverse=True)
+        
+        return [(self.products[i], score) for i, score in similarities[:top_k]]
     
     def _keyword_search(self, query: str, top_k: int = 5) -> List[Dict]:
-        """Fallback keyword-based search"""
+        """Fallback keyword-based search if embeddings fail"""
         query_lower = query.lower()
         scored_products = []
         
@@ -86,15 +165,13 @@ Example: ["Product A", "Product B", "Product C"]
             score = 0
             searchable_text = json.dumps(product).lower()
             
-            # Simple scoring based on query terms
             for term in query_lower.split():
-                if len(term) > 2:  # Ignore very short words
+                if len(term) > 2:
                     score += searchable_text.count(term)
             
             if score > 0:
                 scored_products.append((score, product))
         
-        # Sort by score and return top_k
         scored_products.sort(reverse=True, key=lambda x: x[0])
         return [p[1] for p in scored_products[:top_k]]
     
@@ -102,29 +179,29 @@ Example: ["Product A", "Product B", "Product C"]
         """Format products for LLM context"""
         formatted = []
         for i, p in enumerate(products, 1):
-            # Handle different JSON structures
             name = p.get('name') or p.get('title') or p.get('product_name', 'Unknown')
             price = p.get('price') or p.get('cost', 'N/A')
             category = p.get('category') or p.get('type', 'General')
-            description = p.get('description', '')[:100]  # Limit length
+            description = p.get('description', '')[:100]
             
             formatted.append(
                 f"{i}. {name} | Category: {category} | Price: {price} | {description}"
             )
         return "\n".join(formatted)
-    
-    def get_product_details(self, product_names: List[str]) -> List[Dict]:
-        """Get full details for specific products"""
-        return [
-            p for p in self.products
-            if p.get('name') in product_names or p.get('title') in product_names
-        ]
 
 
 class ConversationalCrew:
-    def __init__(self, agents, products_json_path: str = "products.json"):
+    def __init__(self, agents, products_json_path: str = "rproducts.json"):
         self.agents = agents
-        self.product_rag = ProductRAG(products_json_path)  # Initialize RAG
+        self.product_rag = ProductRAGWithEmbeddings(products_json_path)
+        
+        # Initialize embeddings at startup (one-time preprocessing)
+        print("\n" + "="*60)
+        print("INITIALIZING RAG SYSTEM")
+        print("="*60)
+        self.product_rag.generate_embeddings()
+        print("="*60 + "\n")
+        
         self.context = {
             "conversation_history": [],
             "user_preferences": {},
@@ -189,8 +266,10 @@ class ConversationalCrew:
         return genai.protos.Tool(function_declarations=function_declarations)
     
     def _get_rag_context(self, user_input: str) -> str:
-        """Get relevant products using RAG for recommendation queries"""
-        # Keywords that indicate a recommendation/search query
+        """
+        Get relevant products using RAG (with embeddings)
+        This now uses fast vector similarity instead of LLM inference
+        """
         recommendation_keywords = [
             'recommend', 'suggest', 'looking for', 'need', 'want', 
             'show me', 'find', 'search', 'buy', 'purchase', 'get'
@@ -200,7 +279,7 @@ class ConversationalCrew:
         is_recommendation_query = any(keyword in user_input_lower for keyword in recommendation_keywords)
         
         if is_recommendation_query:
-            # Retrieve relevant products
+            # Use embedding-based search (FAST!)
             relevant_products = self.product_rag.search_products(user_input, top_k=5)
             
             if relevant_products:
@@ -224,10 +303,10 @@ class ConversationalCrew:
             [f"User: {m['user']}\n{m['agent']}: {m['reply']}" for m in recent_history]
         ) if recent_history else "No previous conversation"
         
-        # Get RAG context (relevant products)
+        # Get RAG context using embedding-based retrieval
         rag_context = self._get_rag_context(user_input)
         
-        # Create comprehensive prompt with RAG
+        # Create comprehensive prompt
         prompt = f"""
 
 You are a multi-agent customer service system for an e-commerce platform.
@@ -243,7 +322,7 @@ CURRENT CONTEXT:
 RECENT CONVERSATION:
 {context_text}
 
-RELEVANT PRODUCTS (from database):
+RELEVANT PRODUCTS (retrieved using embedding similarity):
 {rag_context}
 
 USER MESSAGE: {user_input}
@@ -263,7 +342,7 @@ Instructions:
 """
         
         try:
-            # SINGLE LLM CALL with function calling
+            # Single LLM call with function calling
             response = self.genai_model.generate_content(
                 contents=prompt,
                 tools=[self.agent_tools],
@@ -291,8 +370,7 @@ Instructions:
                     if "products_mentioned" in function_args:
                         new_products = list(function_args["products_mentioned"])
                         self.context["products_mentioned"].extend(new_products)
-                        # Track recommendations
-                        if agent_name == "Recommendation Agent":  # Recommendation agent
+                        if agent_name == "Recommendation Agent":
                             self.context["recommendations_given"].extend(new_products)
                     
                     if "loyalty_points" in function_args:
@@ -343,7 +421,8 @@ Instructions:
             "issues_count": len(self.context["issues_reported"]),
             "loyalty_points": self.context["loyalty_points"],
             "recommendations_made": len(self.context["recommendations_given"]),
-            "total_products_in_db": len(self.product_rag.products)
+            "total_products_in_db": len(self.product_rag.products),
+            "embeddings_ready": self.product_rag.embeddings_generated
         }
 
 
@@ -363,7 +442,6 @@ class MeetingPrepAgents:
         llm=llm,
         verbose=False
     )
-
     Inventory_Agent = Agent(
         role="Inventory Specialist",
         goal="Manage inventory levels and stock availability.",
@@ -371,7 +449,6 @@ class MeetingPrepAgents:
         llm=llm,
         verbose=False
     )
-
     Cart_Agent = Agent(
         role="Shopping Cart Specialist",
         goal="Manage shopping cart operations and user interactions.",
@@ -379,7 +456,6 @@ class MeetingPrepAgents:
         llm=llm,
         verbose=False
     )
-
     Fulfillment_Agent = Agent(
         role="Logistics Coordinator",
         goal="Coordinate logistics and ensure timely delivery of items.",
@@ -387,7 +463,6 @@ class MeetingPrepAgents:
         llm=llm,
         verbose=False
     )
-
     Payment_Agent = Agent(
         role="Financial Transactions Expert",
         goal="Handle payment processing and financial records.",
@@ -395,7 +470,6 @@ class MeetingPrepAgents:
         llm=llm,
         verbose=False
     )
-
     Post_Purchase_Agent = Agent(
         role="Customer Relations Specialist",
         goal="Manage post-purchase follow-ups and customer satisfaction.",
@@ -403,7 +477,6 @@ class MeetingPrepAgents:
         llm=llm,
         verbose=False
     )
-    
     Loyalty_and_Offers_Agent = Agent(
         role="Customer Loyalty Specialist",
         goal="Manage customer loyalty programs and special offers.",
@@ -411,7 +484,6 @@ class MeetingPrepAgents:
         llm=llm,
         verbose=False
     )
-
     CRM_Agent = Agent(
         role="Customer Relationship Manager",
         goal="Maintain and update customer relationship management systems.",
@@ -419,7 +491,6 @@ class MeetingPrepAgents:
         llm=llm,
         verbose=False
     )
-
     Error_Handling_Agent = Agent(
         role="Technical Support Specialist",
         goal="Identify and resolve technical issues in the shopping process.",
@@ -429,7 +500,7 @@ class MeetingPrepAgents:
     )
 
 
-# Create the conversational crew with RAG
+# Create the conversational crew with embedding-based RAG
 crew = ConversationalCrew(
     agents=[
         MeetingPrepAgents.Sales_Agent,
@@ -443,10 +514,9 @@ crew = ConversationalCrew(
         MeetingPrepAgents.CRM_Agent,
         MeetingPrepAgents.Error_Handling_Agent,
     ],
-    products_json_path="rproducts.json"  # Specify your JSON file path
+    products_json_path="rproducts.json"
 )
 
-print("### CrewAI with RAG-Enhanced Recommendations ###")
-print(f"Loaded {len(crew.product_rag.products)} products from database")
+print("\n### CrewAI with Embedding-Based RAG ###")
+print(f"✓ System ready with {len(crew.product_rag.products)} products")
 print("Type 'exit' to quit, 'summary' to see context summary.\n")
-
