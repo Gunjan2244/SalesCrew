@@ -3,13 +3,17 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.security import HTTPBearer
+        # Validate token and get user
+from jose import jwt, JWTError
+from auth import SECRET_KEY, ALGORITHM
 from pydantic import BaseModel
 from typing import Optional
 import asyncio
 from crew_backend import crew
 from auth import (
     register_user, authenticate_user, get_current_user,
-    UserRegister, UserLogin, save_user_session, load_user_session
+    UserRegister, UserLogin, save_user_session, load_user_session,
+    users_collection
 )
 import json
 
@@ -97,6 +101,63 @@ async def get_me(current_user: dict = Depends(get_current_user)):
     }
 
 
+class ProfileUpdate(BaseModel):
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    zipcode: Optional[str] = None
+    country: Optional[str] = None
+
+
+@app.put("/api/update-profile")
+async def update_profile(
+    profile_data: ProfileUpdate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update user profile information"""
+    # Prepare update data
+    update_data = {
+        k: v for k, v in profile_data.dict().items() 
+        if v is not None
+    }
+    
+    if not update_data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No data to update"
+        )
+    
+    # Update user in database
+    result = await users_collection.update_one(
+        {"email": current_user["email"]},
+        {"$set": update_data}
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update profile"
+        )
+    
+    # Get updated user data
+    updated_user = await users_collection.find_one({"email": current_user["email"]})
+    
+    return {
+        "message": "Profile updated successfully",
+        "user": {
+            "email": updated_user["email"],
+            "full_name": updated_user["full_name"],
+            "phone": updated_user.get("phone"),
+            "address": updated_user.get("address"),
+            "city": updated_user.get("city"),
+            "state": updated_user.get("state"),
+            "zipcode": updated_user.get("zipcode"),
+            "country": updated_user.get("country")
+        }
+    }
+
+
 @app.get("/api/products/{product_id}")
 async def get_product(product_id: int):
     """Get product details by ID"""
@@ -121,9 +182,7 @@ async def websocket_endpoint(websocket: WebSocket):
             await websocket.close()
             return
         
-        # Validate token and get user
-        from jose import jwt, JWTError
-        from auth import SECRET_KEY, ALGORITHM, users_collection
+
         
         try:
             payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
@@ -238,66 +297,6 @@ async def logout(current_user: dict = Depends(get_current_user)):
     return {"message": "Logged out successfully"}
 
 
-class ProfileUpdate(BaseModel):
-    phone: Optional[str] = None
-    address: Optional[str] = None
-    city: Optional[str] = None
-    state: Optional[str] = None
-    zipcode: Optional[str] = None
-    country: Optional[str] = None
-
-@app.put("/api/update-profile")
-async def update_profile(
-    profile_data: ProfileUpdate,
-    current_user: dict = Depends(get_current_user)
-):
-    """Update user profile information"""
-    from auth import users_collection
-    
-    # Prepare update data
-    update_data = {
-        k: v for k, v in profile_data.dict().items() 
-        if v is not None
-    }
-    
-    if not update_data:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No data to update"
-        )
-    
-    # Update user in database
-    result = await users_collection.update_one(
-        {"email": current_user["email"]},
-        {"$set": update_data}
-    )
-    
-    if result.modified_count == 0:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to update profile"
-        )
-    
-    # Get updated user data
-    updated_user = await users_collection.find_one({"email": current_user["email"]})
-    
-    return {
-        "message": "Profile updated successfully",
-        "user": {
-            "email": updated_user["email"],
-            "full_name": updated_user["full_name"],
-            "phone": updated_user.get("phone"),
-            "address": updated_user.get("address"),
-            "city": updated_user.get("city"),
-            "state": updated_user.get("state"),
-            "zipcode": updated_user.get("zipcode"),
-            "country": updated_user.get("country")
-        }
-    }
-
 if __name__ == "__main__":
-    import os
     import uvicorn
-
-
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)git p
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

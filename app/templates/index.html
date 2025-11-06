@@ -7,30 +7,14 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     .product-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 16px;
-}
-.product-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 16px;
-}
-
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 12px;
+    }
     
     .product-card {
       transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
-
-    .product-card img {
-  transition: transform 0.4s ease, filter 0.3s ease;
-}
-
-.product-card:hover img {
-  transform: scale(1.05);
-  filter: brightness(1.05);
-}
-
     
     .product-card:hover {
       transform: translateY(-6px) scale(1.02);
@@ -39,7 +23,6 @@
     .line-clamp-2 {
       display: -webkit-box;
       -webkit-line-clamp: 2;
-      line-clamp: 2;
       -webkit-box-orient: vertical;
       overflow: hidden;
     }
