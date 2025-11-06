@@ -2,7 +2,7 @@
 fastapi==0.115.5
 uvicorn[standard]==0.32.1
 
-# MongoDB Driver (MISSING - THIS WAS THE ISSUE)
+# MongoDB Driver - CRITICAL FOR AUTH
 motor==3.3.2
 pymongo==4.6.1
 
@@ -10,6 +10,8 @@ pymongo==4.6.1
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 python-multipart==0.0.9
+bcrypt==4.1.2
+email-validator==2.1.0
 
 # WebSocket Support
 websockets==13.1
