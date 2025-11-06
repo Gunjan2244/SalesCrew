@@ -95,6 +95,15 @@ async def get_me(current_user: dict = Depends(get_current_user)):
     }
 
 
+@app.get("/api/products/{product_id}")
+async def get_product(product_id: int):
+    """Get product details by ID"""
+    for product in crew.product_rag.products:
+        if product.get('id') == product_id:
+            return product
+    raise HTTPException(status_code=404, detail="Product not found")
+
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
@@ -175,14 +184,26 @@ async def websocket_endpoint(websocket: WebSocket):
                     break
                 
                 # Process message
-                agent_name, reply = await asyncio.to_thread(crew.route_message, user_msg)
-                await websocket.send_text(f"🧠 {agent_name}: {reply}")
+                agent_name, reply, product_ids = await asyncio.to_thread(crew.route_message, user_msg)
+                
+                # Send response with product IDs
+                response_data = {
+                    "agent": agent_name,
+                    "message": reply,
+                    "product_ids": product_ids
+                }
+                await websocket.send_text(json.dumps(response_data))
                 
                 # Auto-save session periodically
                 await save_user_session(user_email, crew.context)
                 
             except Exception as e:
-                await websocket.send_text(f"⚠️ Error: {str(e)}")
+                error_data = {
+                    "agent": "System",
+                    "message": f"⚠️ Error: {str(e)}",
+                    "product_ids": []
+                }
+                await websocket.send_text(json.dumps(error_data))
                 break
         
         # Clean up
@@ -192,7 +213,12 @@ async def websocket_endpoint(websocket: WebSocket):
         await websocket.close()
         
     except Exception as e:
-        await websocket.send_text(f"⚠️ Connection error: {str(e)}")
+        error_data = {
+            "agent": "System",
+            "message": f"⚠️ Connection error: {str(e)}",
+            "product_ids": []
+        }
+        await websocket.send_text(json.dumps(error_data))
         await websocket.close()
 
 
@@ -208,3 +234,10 @@ async def logout(current_user: dict = Depends(get_current_user)):
     email = current_user["email"]
     await save_user_session(email, crew.context)
     return {"message": "Logged out successfully"}
+
+if __name__ == "__main__":
+    import os
+    import uvicorn
+
+    port = int(os.environ.get("PORT", "8000"))
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)

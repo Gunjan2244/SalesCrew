@@ -183,9 +183,10 @@ class ProductRAGWithEmbeddings:
             price = p.get('price') or p.get('cost', 'N/A')
             category = p.get('category') or p.get('type', 'General')
             description = p.get('description', '')[:100]
+            product_id = p.get('id', 'N/A')
             
             formatted.append(
-                f"{i}. {name} | Category: {category} | Price: {price} | {description}"
+                f"{i}. {name} (ID: {product_id}) | Category: {category} | Price: {price} | {description}"
             )
         return "\n".join(formatted)
 
@@ -248,6 +249,11 @@ class ConversationalCrew:
                                 type=genai.protos.Type.ARRAY,
                                 description="Products discussed in conversation",
                                 items=genai.protos.Schema(type=genai.protos.Type.STRING)
+                            ),
+                            "product_ids": genai.protos.Schema(
+                                type=genai.protos.Type.ARRAY,
+                                description="IDs of products being recommended or mentioned",
+                                items=genai.protos.Schema(type=genai.protos.Type.NUMBER)
                             ),
                             "loyalty_points": genai.protos.Schema(
                                 type=genai.protos.Type.NUMBER,
@@ -331,14 +337,16 @@ Instructions:
 1. Choose the most appropriate agent based on the user's intent
 2. If this is a recommendation/product query, USE THE RELEVANT PRODUCTS listed above
 3. Generate a helpful, personalized response as that agent
-4. Extract any relevant data (cart items, products, issues, etc.)
-5. Stay in character for the chosen agent
-6. When recommending products, reference the specific products from the database above
-7. End with a question or call to action to keep the conversation going
-8. Acknowledge the user's preferences and history
-9. If the product is not in the database, apologize and suggest alternatives
-10. Make the user flow through the entire shopping process from greeting to purchase
-11. Purchase is not completed without payment
+4. Extract product IDs from the database above and include them in the product_ids array
+5. Extract any relevant data (cart items, products, issues, etc.)
+6. Stay in character for the chosen agent
+7. When recommending products, reference the specific products from the database above
+8. ALWAYS include product IDs in the product_ids field when mentioning products
+9. End with a question or call to action to keep the conversation going
+10. Acknowledge the user's preferences and history
+11. If the product is not in the database, apologize and suggest alternatives
+12. Make the user flow through the entire shopping process from greeting to purchase
+13. Purchase is not completed without payment
 """
         
         try:
@@ -361,6 +369,11 @@ Instructions:
                     
                     agent_name = agent_function_name.replace("_", " ").title()
                     reply = function_args.get("response", "I'm here to help!")
+                    
+                    # Extract product IDs
+                    product_ids = []
+                    if "product_ids" in function_args:
+                        product_ids = [int(pid) for pid in list(function_args["product_ids"])]
                     
                     # Extract and update context data
                     if "cart_items" in function_args:
@@ -387,10 +400,11 @@ Instructions:
                         "user": user_input,
                         "agent": agent_name,
                         "reply": reply,
+                        "product_ids": product_ids,
                         "timestamp": datetime.datetime.now().isoformat()
                     })
                     
-                    return agent_name, reply
+                    return agent_name, reply, product_ids
                 
                 elif part.text:
                     text_response = part.text
@@ -398,9 +412,10 @@ Instructions:
                         "user": user_input,
                         "agent": "General Assistant",
                         "reply": text_response,
+                        "product_ids": [],
                         "timestamp": datetime.datetime.now().isoformat()
                     })
-                    return "General Assistant", text_response
+                    return "General Assistant", text_response, []
             
             raise ValueError("No valid response from model")
                 
@@ -408,7 +423,7 @@ Instructions:
             import traceback
             error_msg = f"I apologize, I encountered an error: {str(e)}"
             print(f"\nDebug - Full error:\n{traceback.format_exc()}")
-            return "Error Handler", error_msg
+            return "Error Handler", error_msg, []
     
     def get_context_summary(self):
         """Get a summary of all stored context data"""
@@ -438,7 +453,7 @@ class MeetingPrepAgents:
         role="Recommendation Agent",
         goal="Analyze items available in the store and make personalized recommendations based on product database.",
         backstory="Expert in product analytics with access to comprehensive product database. Uses data-driven insights to match customers with perfect products. " \
-        "Start showing relevant products from the database the moment a user expresses interest.",
+        "Start showing relevant products from the database the moment a user expresses interest. ALWAYS include product IDs.",
         llm=llm,
         verbose=False
     )
