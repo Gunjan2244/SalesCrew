@@ -3,6 +3,8 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.security import HTTPBearer
+from pydantic import BaseModel
+from typing import Optional
 import asyncio
 from crew_backend import crew
 from auth import (
@@ -235,9 +237,67 @@ async def logout(current_user: dict = Depends(get_current_user)):
     await save_user_session(email, crew.context)
     return {"message": "Logged out successfully"}
 
+
+class ProfileUpdate(BaseModel):
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    zipcode: Optional[str] = None
+    country: Optional[str] = None
+
+@app.put("/api/update-profile")
+async def update_profile(
+    profile_data: ProfileUpdate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update user profile information"""
+    from auth import users_collection
+    
+    # Prepare update data
+    update_data = {
+        k: v for k, v in profile_data.dict().items() 
+        if v is not None
+    }
+    
+    if not update_data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No data to update"
+        )
+    
+    # Update user in database
+    result = await users_collection.update_one(
+        {"email": current_user["email"]},
+        {"$set": update_data}
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update profile"
+        )
+    
+    # Get updated user data
+    updated_user = await users_collection.find_one({"email": current_user["email"]})
+    
+    return {
+        "message": "Profile updated successfully",
+        "user": {
+            "email": updated_user["email"],
+            "full_name": updated_user["full_name"],
+            "phone": updated_user.get("phone"),
+            "address": updated_user.get("address"),
+            "city": updated_user.get("city"),
+            "state": updated_user.get("state"),
+            "zipcode": updated_user.get("zipcode"),
+            "country": updated_user.get("country")
+        }
+    }
+
 if __name__ == "__main__":
     import os
     import uvicorn
 
 
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)git p

@@ -59,7 +59,9 @@ const productImages = {
 };
 
 // WebSocket connection
-const ws = new WebSocket(`ws://${window.location.host}/ws`);
+// Change to (works with HTTPS):
+const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
 const chatbox = document.getElementById("chatbox");
 const input = document.getElementById("userInput");
 const sendBtn = document.getElementById("sendBtn");
