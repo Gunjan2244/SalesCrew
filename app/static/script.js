@@ -59,12 +59,69 @@ const productImages = {
 };
 
 // WebSocket connection
-// Change to (works with HTTPS):
 const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
 const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
 const chatbox = document.getElementById("chatbox");
 const input = document.getElementById("userInput");
 const sendBtn = document.getElementById("sendBtn");
+const voiceBtn = document.getElementById("voiceBtn");
+const voiceIcon = document.getElementById("voiceIcon");
+
+// Voice recognition setup
+let recognition = null;
+let isRecording = false;
+
+if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  recognition = new SpeechRecognition();
+  recognition.continuous = false;
+  recognition.interimResults = false;
+  recognition.lang = 'en-US';
+
+  recognition.onstart = () => {
+    isRecording = true;
+    voiceBtn.classList.add('voice-recording', 'bg-red-500', 'border-red-500');
+    voiceBtn.classList.remove('bg-white', 'border-gray-200');
+    voiceIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"></path>';
+    input.placeholder = 'Listening...';
+  };
+
+  recognition.onresult = (event) => {
+    const transcript = event.results[0][0].transcript;
+    input.value = transcript;
+  };
+
+  recognition.onend = () => {
+    isRecording = false;
+    voiceBtn.classList.remove('voice-recording', 'bg-red-500', 'border-red-500');
+    voiceBtn.classList.add('bg-white', 'border-gray-200');
+    voiceIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path>';
+    input.placeholder = 'Type your message...';
+  };
+
+  recognition.onerror = (event) => {
+    console.error('Speech recognition error:', event.error);
+    isRecording = false;
+    voiceBtn.classList.remove('voice-recording', 'bg-red-500', 'border-red-500');
+    voiceBtn.classList.add('bg-white', 'border-gray-200');
+    input.placeholder = 'Type your message...';
+  };
+} else {
+  voiceBtn.style.display = 'none';
+}
+
+// Voice button handler
+if (voiceBtn) {
+  voiceBtn.onclick = () => {
+    if (!recognition) return;
+    
+    if (isRecording) {
+      recognition.stop();
+    } else {
+      recognition.start();
+    }
+  };
+}
 
 ws.onopen = () => {
   ws.send(JSON.stringify({ token }));
@@ -129,7 +186,7 @@ function createProductCard(product) {
   const price = firstItem ? `₹${firstItem.price}` : 'Price varies';
 
   return `
-    <div class="product-card bg-white rounded-2xl shadow-md overflow-hidden hover:shadow-2xl transition-all duration-300 cursor-pointer border border-gray-100">
+    <div class="product-card bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-xl transition-all duration-300 cursor-pointer border border-gray-200">
       <div class="aspect-[4/3] overflow-hidden bg-gray-50 relative group">
         <img 
           src="${imageUrl}" 
@@ -138,23 +195,22 @@ function createProductCard(product) {
           loading="lazy"
           onerror="this.src='https://placehold.co/400x300?text=No+Image'"
         />
-        <div class="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+        <div class="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
       </div>
       <div class="p-4">
         <h3 class="font-semibold text-gray-900 text-sm mb-1 line-clamp-1">${product.name}</h3>
         <p class="text-xs text-gray-500 mb-2 uppercase tracking-wide">${product.category || 'General'}</p>
-        <div class="flex items-center justify-between">
-          <p class="text-base font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">${price}</p>
-          <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div class="flex items-center justify-between mb-2">
+          <p class="text-lg font-bold text-gray-900">${price}</p>
+          <svg class="w-5 h-5 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
           </svg>
         </div>
-        <p class="text-xs text-gray-600 mt-2 line-clamp-2">${product.description || 'No description available.'}</p>
+        <p class="text-xs text-gray-600 line-clamp-2">${product.description || 'No description available.'}</p>
       </div>
     </div>
   `;
 }
-
 
 async function appendMessage(sender, text, agent = null, productIds = []) {
   const div = document.createElement("div");
@@ -164,7 +220,7 @@ async function appendMessage(sender, text, agent = null, productIds = []) {
     div.classList.add("user-message");
     div.innerHTML = `
       <div class="flex justify-end">
-        <div class="bg-gradient-to-br from-purple-600 to-blue-600 p-4 rounded-2xl max-w-[80%] text-right shadow-lg">
+        <div class="user-message-bubble p-4 rounded-2xl max-w-[85%] sm:max-w-[70%] text-right shadow-md">
           <p class="text-sm text-white">${text}</p>
         </div>
       </div>
@@ -175,12 +231,12 @@ async function appendMessage(sender, text, agent = null, productIds = []) {
     const agentLabel = agent ? agent : "Assistant";
     
     let messageHtml = `
-      <div class="flex gap-3">
-        <div class="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl flex items-center justify-center shadow-sm">
+      <div class="flex gap-2 sm:gap-3">
+        <div class="flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 bg-gray-100 rounded-lg flex items-center justify-center">
           ${agentIcon}
         </div>
         <div class="flex-1">
-          <div class="bg-white p-4 rounded-2xl shadow-md border border-gray-100 max-w-[85%]">
+          <div class="bot-message-bubble p-4 rounded-2xl shadow-sm max-w-[85%] sm:max-w-[90%]">
             <p class="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">${agentLabel}</p>
             <p class="text-sm text-gray-800 leading-relaxed">${text.replace(/\n/g, '<br>')}</p>
           </div>
@@ -192,8 +248,8 @@ async function appendMessage(sender, text, agent = null, productIds = []) {
       const products = await loadProductDetails(productIds);
       if (products.length > 0) {
         const productCardsHtml = `
-          <div class="ml-13 mt-3">
-            <div class="product-grid">
+          <div class="mt-4 w-full">
+            <div class="product-grid px-2 sm:px-0">
               ${products.map(p => createProductCard(p)).join('')}
             </div>
           </div>
@@ -210,13 +266,13 @@ async function appendMessage(sender, text, agent = null, productIds = []) {
 }
 
 function getAgentIcon(agent) {
-  if (!agent) return '<svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>';
+  if (!agent) return '<svg class="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>';
   
   const icons = {
-    'Product Recommendation Agent': '<svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>',
-    'Customer Support Agent': '<svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>',
-    'Order Processing Agent': '<svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>'
+    'Product Recommendation Agent': '<svg class="w-4 h-4 sm:w-5 sm:h-5 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>',
+    'Customer Support Agent': '<svg class="w-4 h-4 sm:w-5 sm:h-5 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>',
+    'Order Processing Agent': '<svg class="w-4 h-4 sm:w-5 sm:h-5 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>'
   };
   
-  return icons[agent] || '<svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>';
+  return icons[agent] || '<svg class="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>';
 }

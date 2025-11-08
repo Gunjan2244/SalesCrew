@@ -8,16 +8,37 @@
   <style>
     .product-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-      gap: 12px;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 20px;
+      width: 100%;
+      animation: fadeInUp 0.5s ease-out;
+    }
+    
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
     
     .product-card {
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     }
     
     .product-card:hover {
-      transform: translateY(-6px) scale(1.02);
+      transform: translateY(-8px);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+    }
+    
+    .line-clamp-1 {
+      display: -webkit-box;
+      -webkit-line-clamp: 1;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
     }
     
     .line-clamp-2 {
@@ -32,7 +53,7 @@
     }
     
     #chatbox::-webkit-scrollbar {
-      width: 6px;
+      width: 8px;
     }
     
     #chatbox::-webkit-scrollbar-track {
@@ -40,18 +61,18 @@
     }
     
     #chatbox::-webkit-scrollbar-thumb {
-      background: rgba(148, 163, 184, 0.4);
+      background: rgba(0, 0, 0, 0.2);
       border-radius: 10px;
     }
     
     #chatbox::-webkit-scrollbar-thumb:hover {
-      background: rgba(148, 163, 184, 0.6);
+      background: rgba(0, 0, 0, 0.3);
     }
 
     @keyframes slideUp {
       from {
         opacity: 0;
-        transform: translateY(10px);
+        transform: translateY(15px);
       }
       to {
         opacity: 1;
@@ -60,62 +81,74 @@
     }
 
     .message-container {
-      animation: slideUp 0.3s ease-out;
+      animation: slideUp 0.4s ease-out;
     }
 
-    .typing-indicator {
-      display: inline-flex;
-      gap: 4px;
+    .voice-recording {
+      animation: pulse 1.5s ease-in-out infinite;
     }
 
-    .typing-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: currentColor;
-      animation: typing 1.4s infinite;
+    @keyframes pulse {
+      0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+      }
+      50% {
+        opacity: 0.8;
+        transform: scale(1.05);
+      }
     }
 
-    .typing-dot:nth-child(2) { animation-delay: 0.2s; }
-    .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+    .voice-wave {
+      animation: wave 1.2s ease-in-out infinite;
+    }
 
-    @keyframes typing {
-      0%, 60%, 100% { opacity: 0.3; }
-      30% { opacity: 1; }
+    @keyframes wave {
+      0%, 100% { height: 12px; }
+      50% { height: 24px; }
+    }
+
+    .user-message-bubble {
+      background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+    }
+
+    .bot-message-bubble {
+      background: #ffffff;
+      border: 1px solid #e5e5e5;
     }
   </style>
   <script src="/static/script.js" defer></script>
 </head>
-<body class="bg-gradient-to-br from-slate-50 to-slate-100 text-gray-800 flex flex-col h-screen">
+<body class="bg-gray-50 text-gray-900 flex flex-col h-screen">
   <!-- Header -->
-  <header class="bg-white/80 backdrop-blur-lg shadow-sm border-b border-gray-200/50 sticky top-0 z-10">
-    <div class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
-      <div class="flex items-center gap-4">
-        <div class="w-10 h-10 bg-gradient-to-br from-purple-600 to-blue-600 rounded-xl flex items-center justify-center shadow-lg">
-          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+  <header class="bg-white border-b border-gray-200 sticky top-0 z-10 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-center">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 sm:w-10 sm:h-10 bg-black rounded-lg flex items-center justify-center shadow-md">
+          <svg class="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path>
           </svg>
         </div>
         <div>
-          <h1 class="text-xl font-bold text-gray-900">CrewAI Assistant</h1>
-          <p class="text-xs text-gray-500">AI-Powered Shopping</p>
+          <h1 class="text-base sm:text-lg font-bold text-gray-900">AI Assistant</h1>
+          <p class="text-xs text-gray-500 hidden sm:block">Intelligent Shopping</p>
         </div>
       </div>
-      <div class="flex items-center gap-3">
-        <div class="hidden sm:flex items-center gap-2 bg-gradient-to-r from-purple-50 to-blue-50 px-4 py-2 rounded-full border border-purple-200/50">
-          <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div class="flex items-center gap-2">
+        <div class="hidden sm:flex items-center gap-2 bg-gray-100 px-3 py-2 rounded-lg">
+          <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
           </svg>
           <span id="userInfo" class="text-sm text-gray-700 font-medium"></span>
         </div>
-        <a href="/profile" class="p-2.5 hover:bg-gray-100 rounded-xl transition text-gray-600 hover:text-gray-900">
+        <a href="/profile" class="p-2 hover:bg-gray-100 rounded-lg transition text-gray-600 hover:text-gray-900">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
           </svg>
         </a>
         <button id="logoutBtn" 
-                class="flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-4 py-2.5 rounded-xl transition shadow-md hover:shadow-lg text-sm font-medium">
+                class="flex items-center gap-2 bg-gray-900 hover:bg-black text-white px-3 sm:px-4 py-2 rounded-lg transition text-sm font-medium">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
           </svg>
@@ -126,38 +159,44 @@
   </header>
 
   <!-- Chat Container -->
-  <div class="flex-1 flex items-center justify-center p-4 overflow-hidden">
-    <div class="w-full max-w-6xl bg-white/70 backdrop-blur-xl rounded-3xl shadow-2xl flex flex-col h-[calc(100vh-140px)] border border-gray-200/50">
+  <div class="flex-1 flex items-center justify-center p-2 sm:p-4 overflow-hidden">
+    <div class="w-full max-w-7xl bg-white rounded-2xl shadow-lg flex flex-col h-[calc(100vh-100px)] sm:h-[calc(100vh-120px)] border border-gray-200">
       <!-- Chat Messages -->
-      <div id="chatbox" class="flex-1 overflow-y-auto p-6 space-y-4">
+      <div id="chatbox" class="flex-1 overflow-y-auto p-3 sm:p-6 space-y-4">
         <!-- Welcome message -->
-        <div class="text-center py-8">
-          <div class="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-purple-100 to-blue-100 rounded-2xl mb-4">
-            <svg class="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div class="text-center py-8 sm:py-12">
+          <div class="inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 bg-gray-100 rounded-2xl mb-4">
+            <svg class="w-7 h-7 sm:w-8 sm:h-8 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
             </svg>
           </div>
-          <h3 class="text-lg font-semibold text-gray-800 mb-2">Welcome to CrewAI Assistant</h3>
-          <p class="text-sm text-gray-600">Ask me anything about our products or start shopping!</p>
+          <h3 class="text-lg sm:text-xl font-semibold text-gray-900 mb-2">Welcome to AI Assistant</h3>
+          <p class="text-sm text-gray-600">Ask me anything about products or start shopping!</p>
         </div>
       </div>
       
       <!-- Input Area -->
-      <div class="border-t border-gray-200/50 p-4 bg-white/50 backdrop-blur-sm rounded-b-3xl">
-        <div class="flex gap-3 items-end">
+      <div class="border-t border-gray-200 p-3 sm:p-4 bg-white rounded-b-2xl">
+        <div class="flex gap-2 sm:gap-3 items-end">
           <div class="flex-1 relative">
             <input id="userInput" 
                    type="text" 
-                   placeholder="Ask me anything..." 
-                   class="w-full border-2 border-gray-200 rounded-2xl px-5 py-3.5 pr-12 focus:outline-none focus:border-purple-400 focus:ring-4 focus:ring-purple-100 transition-all bg-white/80 backdrop-blur-sm text-sm" />
-            <button class="absolute right-3 top-1/2 -translate-y-1/2 p-2 hover:bg-gray-100 rounded-xl transition">
+                   placeholder="Type your message..." 
+                   class="w-full border-2 border-gray-200 rounded-xl px-4 sm:px-5 py-2.5 sm:py-3 pr-10 sm:pr-12 focus:outline-none focus:border-gray-900 transition-all bg-white text-sm" />
+            <button id="attachBtn" class="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 hover:bg-gray-100 rounded-lg transition hidden sm:block">
               <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path>
               </svg>
             </button>
           </div>
+          <button id="voiceBtn" 
+                  class="bg-white border-2 border-gray-200 hover:border-gray-900 text-gray-900 p-2.5 sm:p-3 rounded-xl transition shadow-sm hover:shadow-md">
+            <svg id="voiceIcon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path>
+            </svg>
+          </button>
           <button id="sendBtn" 
-                  class="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white p-3.5 rounded-2xl transition shadow-lg hover:shadow-xl transform hover:scale-105">
+                  class="bg-gray-900 hover:bg-black text-white p-2.5 sm:p-3 rounded-xl transition shadow-md hover:shadow-lg">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
             </svg>
