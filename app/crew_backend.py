@@ -347,6 +347,7 @@ Instructions:
 11. If the product is not in the database, apologize and suggest alternatives
 12. Make the user flow through the entire shopping process from greeting to purchase
 13. Purchase is not completed without payment
+14. If a product is not available, apologize and ask if the user would like to see some suggested items (suggest alternatives in the category ).
 """
         
         try:

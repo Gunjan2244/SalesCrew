@@ -6,34 +6,6 @@
   <title>CrewAI Chatbot</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    .product-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-      gap: 20px;
-      width: 100%;
-      animation: fadeInUp 0.5s ease-out;
-    }
-    
-    @keyframes fadeInUp {
-      from {
-        opacity: 0;
-        transform: translateY(20px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-    
-    .product-card {
-      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    
-    .product-card:hover {
-      transform: translateY(-8px);
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
-    }
-    
     .line-clamp-1 {
       display: -webkit-box;
       -webkit-line-clamp: 1;
@@ -99,15 +71,6 @@
       }
     }
 
-    .voice-wave {
-      animation: wave 1.2s ease-in-out infinite;
-    }
-
-    @keyframes wave {
-      0%, 100% { height: 12px; }
-      50% { height: 24px; }
-    }
-
     .user-message-bubble {
       background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
     }
@@ -116,10 +79,349 @@
       background: #ffffff;
       border: 1px solid #e5e5e5;
     }
+
+    @keyframes slideIn {
+      from {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+
+    @keyframes slideOut {
+      from {
+        transform: translateX(0);
+        opacity: 1;
+      }
+      to {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+    }
+
+    .animate-slideIn {
+      animation: slideIn 0.3s ease-out;
+    }
+
+    .animate-slideOut {
+      animation: slideOut 0.3s ease-in;
+    }
+
+    .side-panel {
+      transition: transform 0.3s ease-in-out;
+    }
+
+    /* Product Display Layer */
+    #productDisplayLayer {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 75vh;
+      z-index: 45;
+      opacity: 0;
+      transform: translateY(-100%);
+      transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+      pointer-events: none;
+    }
+
+    #productDisplayLayer.active {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: all;
+    }
+
+    #productDisplayLayer::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(30px);
+      -webkit-backdrop-filter: blur(30px);
+    }
+
+    #productDisplayContent {
+      position: relative;
+      z-index: 1;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      padding: 3rem 0 2rem;
+    }
+
+    .product-display-scroll {
+      display: flex;
+      gap: 2rem;
+      overflow-x: auto;
+      overflow-y: hidden;
+      padding: 0 4rem 2rem;
+      scroll-behavior: smooth;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(0, 0, 0, 0.3) transparent;
+      flex: 1;
+    }
+
+    .product-display-scroll::-webkit-scrollbar {
+      height: 8px;
+    }
+
+    .product-display-scroll::-webkit-scrollbar-track {
+      background: transparent;
+      margin: 0 4rem;
+    }
+
+    .product-display-scroll::-webkit-scrollbar-thumb {
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 10px;
+    }
+
+    .product-display-scroll::-webkit-scrollbar-thumb:hover {
+      background: rgba(0, 0, 0, 0.5);
+    }
+
+    .product-card-display {
+      flex-shrink: 0;
+      width: 380px;
+      height: 550px;
+      position: relative;
+      border-radius: 24px;
+      overflow: hidden;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      animation: slideInProduct 0.6s ease-out backwards;
+    }
+
+    .product-card-display:nth-child(1) { animation-delay: 0.1s; }
+    .product-card-display:nth-child(2) { animation-delay: 0.2s; }
+    .product-card-display:nth-child(3) { animation-delay: 0.3s; }
+    .product-card-display:nth-child(4) { animation-delay: 0.4s; }
+    .product-card-display:nth-child(5) { animation-delay: 0.5s; }
+
+    @keyframes slideInProduct {
+      from {
+        opacity: 0;
+        transform: translateY(50px) scale(0.95);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    .product-card-display:hover {
+      transform: translateY(-12px) scale(1.02);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+    }
+
+    .product-image-container {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .product-image {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: transform 0.6s ease;
+    }
+
+    .product-card-display:hover .product-image {
+      transform: scale(1.08);
+    }
+
+    .product-overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to top, 
+        rgba(0, 0, 0, 0.95) 0%, 
+        rgba(0, 0, 0, 0.5) 40%,
+        rgba(0, 0, 0, 0.3) 60%,
+        transparent 100%);
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      padding: 2rem;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .product-card-display:hover .product-overlay {
+      opacity: 1;
+    }
+
+    .product-overlay-content {
+      transform: translateY(20px);
+      transition: transform 0.4s ease;
+    }
+
+    .product-card-display:hover .product-overlay-content {
+      transform: translateY(0);
+    }
+
+    .product-category {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      background: rgba(255, 255, 255, 0.2);
+      backdrop-filter: blur(10px);
+      border-radius: 20px;
+      color: white;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 0.75rem;
+    }
+
+    .product-name {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: white;
+      margin-bottom: 0.5rem;
+      line-height: 1.3;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .product-price {
+      font-size: 2rem;
+      font-weight: 800;
+      color: white;
+      margin-bottom: 1.5rem;
+      text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    }
+
+    .product-actions {
+      display: flex;
+      gap: 0.75rem;
+    }
+
+    .action-btn {
+      flex: 1;
+      padding: 0.875rem 1.25rem;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 0.875rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      transition: all 0.3s ease;
+      border: none;
+      cursor: pointer;
+    }
+
+    .action-btn-cart {
+      background: white;
+      color: #1a1a1a;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .action-btn-cart:hover {
+      background: #f0f0f0;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+    }
+
+    .action-btn-wishlist {
+      background: rgba(255, 255, 255, 0.2);
+      backdrop-filter: blur(10px);
+      color: white;
+      border: 2px solid rgba(255, 255, 255, 0.5);
+      padding: 0.75rem;
+    }
+
+    .action-btn-wishlist:hover {
+      background: rgba(255, 255, 255, 0.3);
+      border-color: white;
+      transform: translateY(-2px);
+    }
+
+    /* Product Stack */
+    #productStack {
+      position: fixed;
+      bottom: 100px;
+      right: 20px;
+      width: 80px;
+      height: 100px;
+      z-index: 40;
+      cursor: pointer;
+      transition: transform 0.3s ease;
+    }
+
+    #productStack:hover {
+      transform: scale(1.05);
+    }
+
+    .stack-item {
+      position: absolute;
+      width: 70px;
+      height: 70px;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      border: 3px solid white;
+      transform: rotate(calc(var(--stack-index) * -3deg)) translateY(calc(var(--stack-index) * -8px));
+      transition: all 0.3s ease;
+    }
+
+    .stack-item:hover {
+      transform: rotate(0deg) translateY(calc(var(--stack-index) * -8px)) scale(1.1);
+      z-index: 10;
+    }
+
+    .stack-badge {
+      position: absolute;
+      top: -8px;
+      right: -8px;
+      background: #1a1a1a;
+      color: white;
+      border-radius: 50%;
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: bold;
+      border: 2px solid white;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+      z-index: 20;
+    }
+
+    #cartPanel, #wishlistPanel {
+      box-shadow: -4px 0 20px rgba(0, 0, 0, 0.1);
+    }
+
+    .badge {
+      position: absolute;
+      top: -6px;
+      right: -6px;
+      min-width: 20px;
+      height: 20px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: bold;
+      padding: 0 6px;
+    }
   </style>
-  <script src="/static/script.js" defer></script>
 </head>
 <body class="bg-gray-50 text-gray-900 flex flex-col h-screen">
+  <!-- Product Display Layer -->
+  <div id="productDisplayLayer" class="hidden">
+    <div id="productDisplayContent" class="max-w-7xl mx-auto"></div>
+  </div>
+
   <!-- Header -->
   <header class="bg-white border-b border-gray-200 sticky top-0 z-10 shadow-sm">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-center">
@@ -141,6 +443,23 @@
           </svg>
           <span id="userInfo" class="text-sm text-gray-700 font-medium"></span>
         </div>
+        
+        <!-- Wishlist Button -->
+        <button onclick="toggleWishlist()" class="relative p-2 hover:bg-gray-100 rounded-lg transition text-gray-600 hover:text-gray-900">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
+          </svg>
+          <span id="wishlistBadge" class="badge bg-red-500 text-white" style="display: none;">0</span>
+        </button>
+        
+        <!-- Cart Button -->
+        <button onclick="toggleCart()" class="relative p-2 hover:bg-gray-100 rounded-lg transition text-gray-600 hover:text-gray-900">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path>
+          </svg>
+          <span id="cartBadge" class="badge bg-gray-900 text-white" style="display: none;">0</span>
+        </button>
+        
         <a href="/profile" class="p-2 hover:bg-gray-100 rounded-lg transition text-gray-600 hover:text-gray-900">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
@@ -183,11 +502,6 @@
                    type="text" 
                    placeholder="Type your message..." 
                    class="w-full border-2 border-gray-200 rounded-xl px-4 sm:px-5 py-2.5 sm:py-3 pr-10 sm:pr-12 focus:outline-none focus:border-gray-900 transition-all bg-white text-sm" />
-            <button id="attachBtn" class="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 hover:bg-gray-100 rounded-lg transition hidden sm:block">
-              <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path>
-              </svg>
-            </button>
           </div>
           <button id="voiceBtn" 
                   class="bg-white border-2 border-gray-200 hover:border-gray-900 text-gray-900 p-2.5 sm:p-3 rounded-xl transition shadow-sm hover:shadow-md">
@@ -211,5 +525,71 @@
       </div>
     </div>
   </div>
+
+  <!-- Product Stack (Click to view all) -->
+  <div id="productStack" onclick="openProductStackView()" style="display: none;">
+    <div class="stack-badge" id="stackCount">0</div>
+  </div>
+
+  <!-- Cart Side Panel -->
+  <div id="cartPanel" class="side-panel fixed top-0 right-0 h-full w-full sm:w-96 bg-white z-50 transform translate-x-full flex flex-col">
+    <div class="flex items-center justify-between p-4 border-b">
+      <h2 class="text-xl font-bold text-gray-900 flex items-center gap-2">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path>
+        </svg>
+        Shopping Cart
+      </h2>
+      <button onclick="toggleCart()" class="p-2 hover:bg-gray-100 rounded-lg transition">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
+    </div>
+    <div id="cartItems" class="flex-1 overflow-y-auto p-4 space-y-3"></div>
+    <div class="border-t p-4 bg-gray-50">
+      <div class="flex justify-between items-center mb-4">
+        <span class="text-lg font-semibold text-gray-700">Total:</span>
+        <span id="cartTotal" class="text-2xl font-bold text-gray-900">₹0</span>
+      </div>
+      <button class="w-full bg-gray-900 hover:bg-black text-white py-3 rounded-xl transition font-semibold">
+        Proceed to Checkout
+      </button>
+    </div>
+  </div>
+
+  <!-- Wishlist Side Panel -->
+  <div id="wishlistPanel" class="side-panel fixed top-0 right-0 h-full w-full sm:w-96 bg-white z-50 transform translate-x-full flex flex-col">
+    <div class="flex items-center justify-between p-4 border-b">
+      <h2 class="text-xl font-bold text-gray-900 flex items-center gap-2">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
+        </svg>
+        Wishlist
+      </h2>
+      <button onclick="toggleWishlist()" class="p-2 hover:bg-gray-100 rounded-lg transition">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
+    </div>
+    <div id="wishlistItems" class="flex-1 overflow-y-auto p-4 space-y-3"></div>
+  </div>
+
+  <!-- Product Modal (Full Detail View) -->
+  <div id="productModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" onclick="if(event.target === this) closeProductModal()">
+    <div class="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+      <div id="modalProductContent" class="p-6"></div>
+    </div>
+  </div>
+
+  <!-- Product Stack Modal (All Viewed Products) -->
+  <div id="productStackModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" onclick="if(event.target === this) closeProductStackView()">
+    <div class="bg-white rounded-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+      <div id="stackModalContent" class="p-6"></div>
+    </div>
+  </div>
+
+  <script src="/static/script.js"></script>
 </body>
 </html>
