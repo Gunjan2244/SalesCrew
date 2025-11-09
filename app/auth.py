@@ -1,6 +1,6 @@
 from motor.motor_asyncio import AsyncIOMotorClient
 from passlib.context import CryptContext
-from datetime import datetime, timedelta,timezone
+from datetime import datetime, timedelta, timezone
 from jose import JWTError, jwt
 from fastapi import HTTPException, status, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -38,12 +38,12 @@ class UserRegister(BaseModel):
     email: EmailStr
     password: str
     full_name: str
-    phone: str  # Optional phone number
-    address: Optional[str] = None  # Optional address
-    city: Optional[str] = None  # Optional city
-    state: Optional[str] = None  # Optional state
-    zipcode: Optional[str] = None  # Optional zipcode
-    country: Optional[str] = None  # Optional country
+    phone: str
+    address: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    zipcode: Optional[str] = None
+    country: Optional[str] = None
 
 
 class UserLogin(BaseModel):
@@ -98,7 +98,8 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         email: Optional[str] = payload.get("sub")
         if email is None:
             raise credentials_exception
-    except JWTError:
+    except JWTError as e:
+        print(f"JWT Error: {e}")
         raise credentials_exception
     
     user = await users_collection.find_one({"email": email})
@@ -117,13 +118,18 @@ async def register_user(user_data: UserRegister):
             detail="Email already registered"
         )
     
-    # Create new user
+    # Create new user - FIXED: using timezone-aware datetime
     user_dict = {
         "email": user_data.email,
         "full_name": user_data.full_name,
         "phone": user_data.phone,
+        "address": user_data.address,
+        "city": user_data.city,
+        "state": user_data.state,
+        "zipcode": user_data.zipcode,
+        "country": user_data.country,
         "hashed_password": get_password_hash(user_data.password),
-        "created_at": datetime.utcnow(),
+        "created_at": datetime.now(timezone.utc),
         "is_active": True
     }
     
@@ -183,7 +189,7 @@ async def save_user_session(email: str, session_data: dict):
     session_doc = {
         "email": email,
         "session_data": session_data,
-        "updated_at": datetime.utcnow()
+        "updated_at": datetime.now(timezone.utc)
     }
     
     await sessions_collection.update_one(

@@ -2,7 +2,10 @@
 const token = localStorage.getItem('token');
 const user = JSON.parse(localStorage.getItem('user') || '{}');
 
+console.log('🔐 Auth check:', { hasToken: !!token, user: user.email });
+
 if (!token) {
+  console.log('❌ No token found, redirecting to login');
   window.location.href = '/login';
 }
 
@@ -12,14 +15,8 @@ const logoutBtn = document.getElementById('logoutBtn');
 
 if (userInfo && user.full_name) {
   userInfo.textContent = user.full_name;
+  console.log('✅ User info displayed:', user.full_name);
 }
-
-// Cart, Wishlist, and Product Display State
-let cartItems = [];
-let wishlistItems = [];
-let allDisplayedProducts = [];
-let currentDisplayProducts = null;
-let currentMessageElement = null;
 
 // Logout handler
 if (logoutBtn) {
@@ -40,6 +37,13 @@ if (logoutBtn) {
     }
   };
 }
+
+// Cart, Wishlist, and Product Display State
+let cartItems = [];
+let wishlistItems = [];
+let allDisplayedProducts = [];
+let currentDisplayProducts = null;
+let currentMessageElement = null;
 
 // Product image mapping
 const productImages = {
@@ -65,14 +69,20 @@ const productImages = {
   20: 'https://images.unsplash.com/photo-1524592094714-0f0654e20314?w=400&h=400&fit=crop'
 };
 
-// WebSocket connection
+// WebSocket connection with comprehensive debugging
 const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+const wsUrl = `${protocol}//${window.location.host}/ws`;
+console.log('🔌 Connecting to WebSocket:', wsUrl);
+
+const ws = new WebSocket(wsUrl);
 const chatbox = document.getElementById("chatbox");
 const input = document.getElementById("userInput");
 const sendBtn = document.getElementById("sendBtn");
 const voiceBtn = document.getElementById("voiceBtn");
 const voiceIcon = document.getElementById("voiceIcon");
+
+let wsReady = false;
+let messageQueue = [];
 
 // Voice recognition setup
 let recognition = null;
@@ -114,7 +124,7 @@ if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
     input.placeholder = 'Type your message...';
   };
 } else {
-  voiceBtn.style.display = 'none';
+  if (voiceBtn) voiceBtn.style.display = 'none';
 }
 
 if (voiceBtn) {
@@ -130,30 +140,72 @@ if (voiceBtn) {
 }
 
 ws.onopen = () => {
-  ws.send(JSON.stringify({ token }));
-  console.log('WebSocket connected and authenticated');
+  console.log('✅ WebSocket connected');
+  console.log('📤 Sending authentication...');
+  
+  try {
+    const authPayload = JSON.stringify({ token });
+    console.log('Auth payload:', { hasToken: !!token, tokenLength: token?.length });
+    ws.send(authPayload);
+    console.log('✅ Auth token sent successfully');
+  } catch (error) {
+    console.error('❌ Error sending auth token:', error);
+    appendMessage("bot", "❌ Failed to authenticate. Please refresh the page.");
+  }
 };
 
 ws.onmessage = (event) => {
+  console.log('📨 Raw message received:', event.data);
+  
   try {
     const data = JSON.parse(event.data);
+    console.log('📦 Parsed message data:', data);
+    
+    // Check if this is the welcome message
+    if (data.message && data.message.includes('Welcome')) {
+      wsReady = true;
+      console.log('✅ WebSocket authenticated and ready');
+      
+      // Process any queued messages
+      if (messageQueue.length > 0) {
+        console.log('📬 Processing queued messages:', messageQueue.length);
+        messageQueue.forEach(msg => {
+          ws.send(msg);
+        });
+        messageQueue = [];
+      }
+    }
+    
     if (data.agent && data.message) {
+      console.log('💬 Displaying message from:', data.agent);
       appendMessage("bot", data.message, data.agent, data.product_ids || []);
+    } else if (data.message) {
+      console.log('💬 Displaying system message');
+      appendMessage("bot", data.message);
     } else {
+      console.warn('⚠️ Unrecognized message format:', data);
       appendMessage("bot", event.data);
     }
   } catch (e) {
+    console.error('❌ Error parsing message:', e);
+    console.log('Raw data:', event.data);
     appendMessage("bot", event.data);
   }
 };
 
 ws.onerror = (error) => {
-  console.error('WebSocket error:', error);
-  appendMessage("bot", "⚠️ Connection error. Please refresh the page.");
+  console.error('❌ WebSocket error:', error);
+  appendMessage("bot", "⚠️ Connection error. Please check your internet connection and refresh the page.");
 };
 
-ws.onclose = () => {
+ws.onclose = (event) => {
+  console.log('🔴 WebSocket closed');
+  console.log('Close code:', event.code);
+  console.log('Close reason:', event.reason);
+  console.log('Clean close:', event.wasClean);
+  
   appendMessage("bot", "Connection closed. Please refresh to reconnect.");
+  wsReady = false;
 };
 
 sendBtn.onclick = sendMessage;
@@ -163,36 +215,157 @@ input.addEventListener("keypress", (e) => {
 
 function sendMessage() {
   const msg = input.value.trim();
-  if (!msg) return;
+  console.log('📝 Attempting to send message:', msg);
   
+  if (!msg) {
+    console.log('⚠️ Empty message, ignoring');
+    return;
+  }
+  
+  console.log('WebSocket state:', {
+    readyState: ws.readyState,
+    wsReady: wsReady,
+    CONNECTING: WebSocket.CONNECTING,
+    OPEN: WebSocket.OPEN,
+    CLOSING: WebSocket.CLOSING,
+    CLOSED: WebSocket.CLOSED
+  });
+  
+  if (ws.readyState !== WebSocket.OPEN) {
+    console.error('❌ WebSocket not open. State:', ws.readyState);
+    appendMessage("bot", "⚠️ Connection lost. Please refresh the page.");
+    return;
+  }
+  
+  if (!wsReady) {
+    console.log('⏳ WebSocket not ready, queuing message');
+    messageQueue.push(msg);
+    appendMessage("bot", "⏳ Authenticating... Your message will be sent shortly.");
+    input.value = "";
+    return;
+  }
+  
+  // Display user message immediately
+  console.log('✅ Displaying user message');
   appendMessage("user", msg);
-  ws.send(msg);
+  
+  try {
+    console.log('📤 Sending message to server');
+    ws.send(msg);
+    console.log('✅ Message sent successfully');
+  } catch (error) {
+    console.error('❌ Error sending message:', error);
+    appendMessage("bot", "⚠️ Failed to send message. Please try again.");
+  }
+  
   input.value = "";
 }
 
 async function loadProductDetails(productIds) {
+  console.log('🔍 Loading product details for IDs:', productIds);
   const products = [];
+  
   for (const id of productIds) {
     try {
       const response = await fetch(`/api/products/${id}`);
       if (response.ok) {
         const product = await response.json();
         products.push(product);
+        console.log('✅ Loaded product:', product.name);
+      } else {
+        console.error('❌ Failed to load product:', id, response.status);
       }
     } catch (error) {
-      console.error(`Error loading product ${id}:`, error);
+      console.error(`❌ Error loading product ${id}:`, error);
     }
   }
+  
+  console.log('📦 Total products loaded:', products.length);
   return products;
 }
 
+async function appendMessage(sender, text, agent = null, productIds = []) {
+  console.log('💬 Appending message:', { sender, agent, textLength: text.length, productIds });
+  
+  const div = document.createElement("div");
+  div.classList.add("message-container", "mb-4");
+  
+  if (sender === "user") {
+    div.classList.add("user-message");
+    div.innerHTML = `
+      <div class="flex justify-end">
+        <div class="user-message-bubble p-4 rounded-2xl max-w-[85%] sm:max-w-[70%] text-right shadow-md">
+          <p class="text-sm text-white">${escapeHtml(text)}</p>
+        </div>
+      </div>
+    `;
+  } else {
+    div.classList.add("bot-message");
+    const agentIcon = getAgentIcon(agent);
+    const agentLabel = agent ? agent : "Assistant";
+    
+    div.innerHTML = `
+      <div class="flex gap-2 sm:gap-3">
+        <div class="flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 bg-gray-100 rounded-lg flex items-center justify-center">
+          ${agentIcon}
+        </div>
+        <div class="flex-1">
+          <div class="bot-message-bubble p-4 rounded-2xl shadow-sm max-w-[85%] sm:max-w-[90%]">
+            <p class="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">${agentLabel}</p>
+            <p class="text-sm text-gray-800 leading-relaxed">${escapeHtml(text).replace(/\n/g, '<br>')}</p>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    // Load and display products if available
+    if (productIds && productIds.length > 0) {
+      console.log('🛍️ Loading products for display:', productIds);
+      const products = await loadProductDetails(productIds);
+      if (products.length > 0) {
+        console.log('✅ Showing product display with', products.length, 'products');
+        showProductDisplay(products, div);
+      }
+    }
+  }
+  
+  if (!chatbox) {
+    console.error('❌ Chatbox element not found!');
+    return;
+  }
+  
+  chatbox.appendChild(div);
+  chatbox.scrollTop = chatbox.scrollHeight;
+  console.log('✅ Message appended to chatbox');
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function getAgentIcon(agent) {
+  if (!agent) return '<svg class="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>';
+  
+  const icons = {
+    'Recommendation Agent': '<svg class="w-4 h-4 sm:w-5 sm:h-5 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>',
+    'Sales Specialist': '<svg class="w-4 h-4 sm:w-5 sm:h-5 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>',
+    'Shopping Cart Specialist': '<svg class="w-4 h-4 sm:w-5 sm:h-5 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>',
+    'Financial Transactions Expert': '<svg class="w-4 h-4 sm:w-5 sm:h-5 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>'
+  };
+  
+  return icons[agent] || '<svg class="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>';
+}
+
+// Product display functions
 function showProductDisplay(products, messageElement) {
+  console.log('🎨 Showing product display');
   if (!products || products.length === 0) return;
   
   currentDisplayProducts = products;
   currentMessageElement = messageElement;
   
-  // Add to all displayed products
   allDisplayedProducts.push(...products);
   updateProductStack();
   
@@ -226,7 +399,6 @@ function closeProductDisplay() {
   setTimeout(() => {
     displayLayer.classList.add('hidden');
     
-    // Attach products to the message as small boxes
     if (currentMessageElement && currentDisplayProducts) {
       attachProductsToMessage(currentMessageElement, currentDisplayProducts);
     }
@@ -258,7 +430,6 @@ function attachProductsToMessage(messageElement, products) {
     `;
   }).join('');
   
-  // Find the message bubble and append after it
   const messageBubble = messageElement.querySelector('.bot-message-bubble');
   if (messageBubble) {
     messageBubble.parentElement.appendChild(compactContainer);
@@ -312,7 +483,6 @@ function updateProductStack() {
   
   if (!stackContainer) return;
   
-  // Get unique products (last 5)
   const uniqueProducts = Array.from(new Map(allDisplayedProducts.map(p => [p.id, p])).values()).slice(-5);
   
   stackContainer.innerHTML = uniqueProducts.map((product, index) => {
@@ -335,7 +505,6 @@ function openProductStackView() {
   const modal = document.getElementById('productStackModal');
   const modalContent = document.getElementById('stackModalContent');
   
-  // Get unique products
   const uniqueProducts = Array.from(new Map(allDisplayedProducts.map(p => [p.id, p])).values());
   
   modalContent.innerHTML = `
@@ -378,18 +547,13 @@ function createCompactProductCard(product) {
   `;
 }
 
+// Cart and Wishlist functions
 function addToCart(product) {
   const existingItem = cartItems.find(item => item.id === product.id);
   if (!existingItem) {
     cartItems.push({ ...product, quantity: 1 });
     updateCartDisplay();
     showNotification('Added to cart!', 'success');
-    
-    ws.send(JSON.stringify({
-      action: 'add_to_cart',
-      product_id: product.id,
-      product_name: product.name
-    }));
   } else {
     existingItem.quantity++;
     updateCartDisplay();
@@ -659,60 +823,4 @@ function moveToCart(product) {
   updateWishlistPanel();
 }
 
-async function appendMessage(sender, text, agent = null, productIds = []) {
-  const div = document.createElement("div");
-  div.classList.add("message-container", "mb-4");
-  
-  if (sender === "user") {
-    div.classList.add("user-message");
-    div.innerHTML = `
-      <div class="flex justify-end">
-        <div class="user-message-bubble p-4 rounded-2xl max-w-[85%] sm:max-w-[70%] text-right shadow-md">
-          <p class="text-sm text-white">${text}</p>
-        </div>
-      </div>
-    `;
-  } else {
-    div.classList.add("bot-message");
-    const agentIcon = getAgentIcon(agent);
-    const agentLabel = agent ? agent : "Assistant";
-    
-    div.innerHTML = `
-      <div class="flex gap-2 sm:gap-3">
-        <div class="flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 bg-gray-100 rounded-lg flex items-center justify-center">
-          ${agentIcon}
-        </div>
-        <div class="flex-1">
-          <div class="bot-message-bubble p-4 rounded-2xl shadow-sm max-w-[85%] sm:max-w-[90%]">
-            <p class="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">${agentLabel}</p>
-            <p class="text-sm text-gray-800 leading-relaxed">${text.replace(/\n/g, '<br>')}</p>
-          </div>
-        </div>
-      </div>
-    `;
-    
-    // Load and display products if available
-    if (productIds && productIds.length > 0) {
-      const products = await loadProductDetails(productIds);
-      if (products.length > 0) {
-        showProductDisplay(products, div);
-      }
-    }
-  }
-  
-  chatbox.appendChild(div);
-  chatbox.scrollTop = chatbox.scrollHeight;
-}
-
-function getAgentIcon(agent) {
-  if (!agent) return '<svg class="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>';
-  
-  const icons = {
-    'Recommendation Agent': '<svg class="w-4 h-4 sm:w-5 sm:h-5 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>',
-    'Sales Specialist': '<svg class="w-4 h-4 sm:w-5 sm:h-5 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>',
-    'Shopping Cart Specialist': '<svg class="w-4 h-4 sm:w-5 sm:h-5 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>',
-    'Financial Transactions Expert': '<svg class="w-4 h-4 sm:w-5 sm:h-5 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>'
-  };
-  
-  return icons[agent] || '<svg class="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>';
-}
+console.log('✅ Script loaded successfully');

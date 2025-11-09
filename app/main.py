@@ -170,38 +170,76 @@ async def get_product(product_id: int):
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
+    user_email = None
     
-    # First message should contain the JWT token
     try:
-        auth_message = await websocket.receive_text()
-        auth_data = json.loads(auth_message)
-        token = auth_data.get("token")
+        # Wait for authentication message with timeout
+        auth_message = await asyncio.wait_for(
+            websocket.receive_text(), 
+            timeout=10.0
+        )
         
-        if not token:
-            await websocket.send_text("❌ Authentication required")
+        try:
+            auth_data = json.loads(auth_message)
+            token = auth_data.get("token")
+        except json.JSONDecodeError:
+            await websocket.send_text(json.dumps({
+                "agent": "System",
+                "message": "❌ Invalid authentication format",
+                "product_ids": []
+            }))
             await websocket.close()
             return
         
-
+        if not token:
+            await websocket.send_text(json.dumps({
+                "agent": "System",
+                "message": "❌ Authentication token required",
+                "product_ids": []
+            }))
+            await websocket.close()
+            return
         
+        # Validate token
         try:
             payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
             email = payload.get("sub")
+            
+            if not email:
+                await websocket.send_text(json.dumps({
+                    "agent": "System",
+                    "message": "❌ Invalid token payload",
+                    "product_ids": []
+                }))
+                await websocket.close()
+                return
+            
             user = await users_collection.find_one({"email": email})
             
             if not user:
-                await websocket.send_text("❌ Invalid authentication")
+                await websocket.send_text(json.dumps({
+                    "agent": "System",
+                    "message": "❌ User not found",
+                    "product_ids": []
+                }))
                 await websocket.close()
                 return
                 
-        except JWTError:
-            await websocket.send_text("❌ Invalid token")
+        except JWTError as e:
+            print(f"JWT validation error: {e}")
+            await websocket.send_text(json.dumps({
+                "agent": "System",
+                "message": "❌ Invalid or expired token",
+                "product_ids": []
+            }))
             await websocket.close()
             return
         
-        # Load user's previous session
+        # Authentication successful
         user_email = user["email"]
         user_name = user["full_name"]
+        
+        # Load user's previous session
         saved_session = await load_user_session(user_email)
         
         if saved_session:
@@ -216,7 +254,13 @@ async def websocket_endpoint(websocket: WebSocket):
             crew.context["customer_info"]["state"] = user.get("state", "")
             crew.context["customer_info"]["zipcode"] = user.get("zipcode", "")
             crew.context["customer_info"]["country"] = user.get("country", "")
-            await websocket.send_text(f"👋 Welcome back, {user_name}! Your previous session has been restored.")
+            
+            welcome_msg = f"👋 Welcome back, {user_name}! Your previous session has been restored."
+            await websocket.send_text(json.dumps({
+                "agent": "System",
+                "message": welcome_msg,
+                "product_ids": []
+            }))
         else:
             # Initialize new session with user info
             crew.context["customer_info"]["name"] = user_name
@@ -227,11 +271,18 @@ async def websocket_endpoint(websocket: WebSocket):
             crew.context["customer_info"]["state"] = user.get("state", "")
             crew.context["customer_info"]["zipcode"] = user.get("zipcode", "")
             crew.context["customer_info"]["country"] = user.get("country", "")
-            await websocket.send_text(f"👋 Welcome {user_name}! Start chatting with our AI agents.")
+            
+            welcome_msg = f"👋 Welcome {user_name}! Start chatting with our AI agents."
+            await websocket.send_text(json.dumps({
+                "agent": "System",
+                "message": welcome_msg,
+                "product_ids": []
+            }))
         
         # Store active session
         active_sessions[user_email] = websocket
         
+        # Main message loop
         while True:
             try:
                 user_msg = await websocket.receive_text()
@@ -240,12 +291,23 @@ async def websocket_endpoint(websocket: WebSocket):
                     # Save session before closing
                     await save_user_session(user_email, crew.context)
                     summary = crew.get_context_summary()
-                    await websocket.send_text(f"📊 Session Summary:\n{json.dumps(summary, indent=2)}")
-                    await websocket.send_text("👋 Session saved. See you next time!")
+                    await websocket.send_text(json.dumps({
+                        "agent": "System",
+                        "message": f"📊 Session Summary:\n{json.dumps(summary, indent=2)}",
+                        "product_ids": []
+                    }))
+                    await websocket.send_text(json.dumps({
+                        "agent": "System",
+                        "message": "👋 Session saved. See you next time!",
+                        "product_ids": []
+                    }))
                     break
                 
                 # Process message
-                agent_name, reply, product_ids = await asyncio.to_thread(crew.route_message, user_msg)
+                agent_name, reply, product_ids = await asyncio.to_thread(
+                    crew.route_message, 
+                    user_msg
+                )
                 
                 # Send response with product IDs
                 response_data = {
@@ -259,6 +321,10 @@ async def websocket_endpoint(websocket: WebSocket):
                 await save_user_session(user_email, crew.context)
                 
             except Exception as e:
+                print(f"Error processing message: {e}")
+                import traceback
+                traceback.print_exc()
+                
                 error_data = {
                     "agent": "System",
                     "message": f"⚠️ Error: {str(e)}",
@@ -267,21 +333,43 @@ async def websocket_endpoint(websocket: WebSocket):
                 await websocket.send_text(json.dumps(error_data))
                 break
         
-        # Clean up
-        if user_email in active_sessions:
-            del active_sessions[user_email]
-        
+    except asyncio.TimeoutError:
+        print("WebSocket authentication timeout")
+        try:
+            await websocket.send_text(json.dumps({
+                "agent": "System",
+                "message": "❌ Authentication timeout",
+                "product_ids": []
+            }))
+        except:
+            pass
         await websocket.close()
+        return
         
     except Exception as e:
-        error_data = {
-            "agent": "System",
-            "message": f"⚠️ Connection error: {str(e)}",
-            "product_ids": []
-        }
-        await websocket.send_text(json.dumps(error_data))
-        await websocket.close()
-
+        print(f"WebSocket connection error: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        try:
+            error_data = {
+                "agent": "System",
+                "message": f"⚠️ Connection error: {str(e)}",
+                "product_ids": []
+            }
+            await websocket.send_text(json.dumps(error_data))
+        except:
+            pass
+        
+    finally:
+        # Clean up
+        if user_email and user_email in active_sessions:
+            del active_sessions[user_email]
+        
+        try:
+            await websocket.close()
+        except:
+            pass
 
 @app.get("/api/summary")
 async def get_summary(current_user: dict = Depends(get_current_user)):
