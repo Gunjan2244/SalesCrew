@@ -242,8 +242,17 @@ class ConversationalCrew:
                             ),
                             "cart_items": genai.protos.Schema(
                                 type=genai.protos.Type.ARRAY,
-                                description="Products to add to cart",
+                                description="Products to add to cart (names or IDs if available)",
                                 items=genai.protos.Schema(type=genai.protos.Type.STRING)
+                            ),
+                            "cart_action": genai.protos.Schema(
+                                type=genai.protos.Type.STRING,
+                                description="Cart action to perform: add, remove, clear, or set"
+                            ),
+                            "cart_product_ids": genai.protos.Schema(
+                                type=genai.protos.Type.ARRAY,
+                                description="Product IDs affected by the cart action",
+                                items=genai.protos.Schema(type=genai.protos.Type.NUMBER)
                             ),
                             "products_mentioned": genai.protos.Schema(
                                 type=genai.protos.Type.ARRAY,
@@ -270,6 +279,28 @@ class ConversationalCrew:
             )
         
         return genai.protos.Tool(function_declarations=function_declarations)
+
+    def _resolve_product_ids_from_names(self, names):
+        """Best-effort mapping of product names to product IDs."""
+        resolved_ids = []
+        if not names:
+            return resolved_ids
+        for name in names:
+            if not isinstance(name, str):
+                continue
+            name_lower = name.strip().lower()
+            if not name_lower:
+                continue
+            for product in self.product_rag.products:
+                product_name = (product.get("name") or product.get("title") or "").lower()
+                if not product_name:
+                    continue
+                if name_lower in product_name or product_name in name_lower:
+                    product_id = product.get("id")
+                    if isinstance(product_id, int):
+                        resolved_ids.append(product_id)
+                    break
+        return resolved_ids
     
     def _get_rag_context(self, user_input: str) -> str:
         """
@@ -348,6 +379,7 @@ Instructions:
 12. Make the user flow through the entire shopping process from greeting to purchase
 13. Purchase is not completed without payment
 14. If a product is not available, apologize and ask if the user would like to see some suggested items (suggest alternatives in the category ).
+15. When modifying the cart, include cart_action (add/remove/clear/set) and cart_product_ids (IDs).
 """
         
         try:
@@ -375,11 +407,51 @@ Instructions:
                     product_ids = []
                     if "product_ids" in function_args:
                         product_ids = [int(pid) for pid in list(function_args["product_ids"])]
-                    
+
                     # Extract and update context data
-                    if "cart_items" in function_args:
-                        new_items = list(function_args["cart_items"])
-                        self.context["cart_items"].extend(new_items)
+                    cart_update = None
+                    cart_action = function_args.get("cart_action")
+                    cart_product_ids = []
+                    if "cart_product_ids" in function_args:
+                        cart_product_ids = [int(pid) for pid in list(function_args["cart_product_ids"])]
+
+                    if not cart_product_ids and "cart_items" in function_args:
+                        cart_items = list(function_args["cart_items"])
+                        cart_product_ids = self._resolve_product_ids_from_names(cart_items)
+
+                    if not cart_product_ids and agent_name == "Shopping Cart Specialist" and product_ids:
+                        cart_product_ids = product_ids
+
+                    if cart_action or cart_product_ids:
+                        normalized_action = (cart_action or "add").strip().lower()
+                        if normalized_action not in {"add", "remove", "clear", "set"}:
+                            normalized_action = "add"
+
+                        existing_ids = []
+                        for pid in self.context["cart_items"]:
+                            if isinstance(pid, int):
+                                existing_ids.append(pid)
+                            elif isinstance(pid, str) and pid.isdigit():
+                                existing_ids.append(int(pid))
+
+                        if normalized_action == "clear":
+                            updated_ids = []
+                        elif normalized_action == "set":
+                            updated_ids = list(dict.fromkeys(cart_product_ids))
+                        elif normalized_action == "remove":
+                            remove_set = set(cart_product_ids)
+                            updated_ids = [pid for pid in existing_ids if pid not in remove_set]
+                        else:
+                            updated_ids = existing_ids[:]
+                            for pid in cart_product_ids:
+                                if pid not in updated_ids:
+                                    updated_ids.append(pid)
+
+                        self.context["cart_items"] = updated_ids
+                        cart_update = {
+                            "action": normalized_action,
+                            "product_ids": cart_product_ids
+                        }
                     
                     if "products_mentioned" in function_args:
                         new_products = list(function_args["products_mentioned"])
@@ -405,7 +477,7 @@ Instructions:
                         "timestamp": datetime.datetime.now().isoformat()
                     })
                     
-                    return agent_name, reply, product_ids
+                    return agent_name, reply, product_ids, cart_update
                 
                 elif part.text:
                     text_response = part.text
@@ -416,7 +488,7 @@ Instructions:
                         "product_ids": [],
                         "timestamp": datetime.datetime.now().isoformat()
                     })
-                    return "General Assistant", text_response, []
+                    return "General Assistant", text_response, [], None
             
             raise ValueError("No valid response from model")
                 
@@ -424,7 +496,7 @@ Instructions:
             import traceback
             error_msg = f"I apologize, I encountered an error: {str(e)}"
             print(f"\nDebug - Full error:\n{traceback.format_exc()}")
-            return "Error Handler", error_msg, []
+            return "Error Handler", error_msg, [], None
     
     def get_context_summary(self):
         """Get a summary of all stored context data"""

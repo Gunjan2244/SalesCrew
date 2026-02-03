@@ -3,7 +3,6 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.security import HTTPBearer
-        # Validate token and get user
 from jose import jwt, JWTError
 from auth import SECRET_KEY, ALGORITHM
 from pydantic import BaseModel
@@ -304,7 +303,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     break
                 
                 # Process message
-                agent_name, reply, product_ids = await asyncio.to_thread(
+                agent_name, reply, product_ids, cart_update = await asyncio.to_thread(
                     crew.route_message, 
                     user_msg
                 )
@@ -313,7 +312,8 @@ async def websocket_endpoint(websocket: WebSocket):
                 response_data = {
                     "agent": agent_name,
                     "message": reply,
-                    "product_ids": product_ids
+                    "product_ids": product_ids,
+                    "cart_update": cart_update
                 }
                 await websocket.send_text(json.dumps(response_data))
                 
