@@ -1,10 +1,18 @@
+"""
+BULLETPROOF CrewAI Backend
+- Handles ALL missing keys safely
+- Complete initialization
+- Your original prompts preserved
+- Embedding cache optimization
+"""
+
 from crewai import Agent, LLM
 from dotenv import load_dotenv
 import os
 import json
 import datetime
 import google.generativeai as genai
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Optional
 import numpy as np
 
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
@@ -15,16 +23,18 @@ llm = LLM(
     api_key=os.getenv("GOOGLE_API_KEY")
 )
 
-class ProductRAGWithEmbeddings:
-    """Proper RAG system using embeddings and cosine similarity"""
+
+class OptimizedProductRAG:
+    """RAG with cached embeddings"""
     
     def __init__(self, products_json_path: str = "rproducts.json"):
         self.products = self._load_products(products_json_path)
+        self.embeddings_file = "product_embeddings.npy"
         self.product_embeddings = None
         self.embeddings_generated = False
-        
+        self._load_or_generate_embeddings()
+    
     def _load_products(self, path: str) -> List[Dict]:
-        """Load products from JSON file"""
         try:
             with open(path, 'r') as f:
                 data = json.load(f)
@@ -35,11 +45,45 @@ class ProductRAGWithEmbeddings:
                 else:
                     return [data]
         except FileNotFoundError:
-            print(f"Warning: {path} not found. Using empty product list.")
+            print(f"Warning: {path} not found.")
             return []
     
+    def _load_or_generate_embeddings(self):
+        if os.path.exists(self.embeddings_file):
+            try:
+                self.product_embeddings = np.load(self.embeddings_file)
+                self.embeddings_generated = True
+                print(f"✓ Loaded {len(self.products)} product embeddings from cache")
+                return
+            except Exception as e:
+                print(f"⚠ Error loading embeddings: {e}")
+        
+        print(f"🔄 Generating embeddings for {len(self.products)} products...")
+        self.generate_and_save_embeddings()
+    
+    def generate_and_save_embeddings(self):
+        if not self.products:
+            return
+        
+        embeddings_list = []
+        for i, product in enumerate(self.products):
+            product_text = self._prepare_product_text(product)
+            result = genai.embed_content(
+                model="models/gemini-embedding-001",
+                content=product_text,
+                task_type="retrieval_document"
+            )
+            embeddings_list.append(result['embedding'])
+            
+            if (i + 1) % 10 == 0:
+                print(f"  Progress: {i + 1}/{len(self.products)}")
+        
+        self.product_embeddings = np.array(embeddings_list)
+        self.embeddings_generated = True
+        np.save(self.embeddings_file, self.product_embeddings)
+        print(f"✓ Embeddings cached")
+    
     def _prepare_product_text(self, product: Dict) -> str:
-        """Convert product dict to searchable text for embedding"""
         name = product.get('name') or product.get('title', 'Unknown')
         category = product.get('category') or product.get('type', '')
         description = product.get('description', '')
@@ -49,44 +93,7 @@ class ProductRAGWithEmbeddings:
         text = f"{name} {category} {description} {features} {price}"
         return text.strip()
     
-    def generate_embeddings(self):
-        """
-        ONE-TIME PREPROCESSING: Generate embeddings for all products
-        Call this once when initializing the system
-        """
-        if self.embeddings_generated:
-            print("✓ Embeddings already generated")
-            return
-        
-        if not self.products:
-            print("⚠ No products to embed")
-            return
-        
-        print(f"🔄 Generating embeddings for {len(self.products)} products...")
-        
-        embeddings_list = []
-        
-        for i, product in enumerate(self.products):
-            product_text = self._prepare_product_text(product)
-            
-            result = genai.embed_content(
-                model="models/text-embedding-004",
-                content=product_text,
-                task_type="retrieval_document"
-            )
-            
-            embeddings_list.append(result['embedding'])
-            
-            if (i + 1) % 50 == 0 or (i + 1) == len(self.products):
-                print(f"  Progress: {i + 1}/{len(self.products)} products")
-        
-        self.product_embeddings = np.array(embeddings_list)
-        self.embeddings_generated = True
-        
-        print(f"✓ Embeddings generated: {self.product_embeddings.shape}")
-    
     def cosine_similarity(self, vec1: np.ndarray, vec2: np.ndarray) -> float:
-        """Calculate cosine similarity between two vectors"""
         dot_product = np.dot(vec1, vec2)
         magnitude1 = np.linalg.norm(vec1)
         magnitude2 = np.linalg.norm(vec2)
@@ -97,51 +104,11 @@ class ProductRAGWithEmbeddings:
         return dot_product / (magnitude1 * magnitude2)
     
     def search_products(self, query: str, top_k: int = 5) -> List[Dict]:
-        """
-        Search products using embedding similarity
-        Returns: List of relevant products (without scores for backward compatibility)
-        """
-        if not self.embeddings_generated:
-            print("⚠ Embeddings not generated yet! Using fallback search.")
+        if not self.embeddings_generated or not self.products:
             return self._keyword_search(query, top_k)
         
-        if not self.products:
-            return []
-        
-        # Generate query embedding
         result = genai.embed_content(
-            model="models/text-embedding-004",
-            content=query,
-            task_type="retrieval_query"
-        )
-        query_embedding = np.array(result['embedding'])
-        
-        # Calculate similarities with all products
-        similarities = []
-        for i, product_emb in enumerate(self.product_embeddings):
-            similarity_score = self.cosine_similarity(query_embedding, product_emb)
-            similarities.append((i, similarity_score))
-        
-        # Sort by similarity (highest first)
-        similarities.sort(key=lambda x: x[1], reverse=True)
-        
-        # Return top-k products
-        top_results = [self.products[i] for i, score in similarities[:top_k]]
-        return top_results
-    
-    def search_products_with_scores(self, query: str, top_k: int = 5) -> List[Tuple[Dict, float]]:
-        """
-        Search products and return with similarity scores
-        Useful for debugging or showing confidence
-        """
-        if not self.embeddings_generated:
-            return [(p, 0.0) for p in self._keyword_search(query, top_k)]
-        
-        if not self.products:
-            return []
-        
-        result = genai.embed_content(
-            model="models/text-embedding-004",
+            model="models/gemini-embedding-001",
             content=query,
             task_type="retrieval_query"
         )
@@ -153,11 +120,9 @@ class ProductRAGWithEmbeddings:
             similarities.append((i, similarity_score))
         
         similarities.sort(key=lambda x: x[1], reverse=True)
-        
-        return [(self.products[i], score) for i, score in similarities[:top_k]]
+        return [self.products[i] for i, score in similarities[:top_k]]
     
     def _keyword_search(self, query: str, top_k: int = 5) -> List[Dict]:
-        """Fallback keyword-based search if embeddings fail"""
         query_lower = query.lower()
         scored_products = []
         
@@ -176,7 +141,6 @@ class ProductRAGWithEmbeddings:
         return [p[1] for p in scored_products[:top_k]]
     
     def _format_products_for_context(self, products: List[Dict]) -> str:
-        """Format products for LLM context"""
         formatted = []
         for i, p in enumerate(products, 1):
             name = p.get('name') or p.get('title') or p.get('product_name', 'Unknown')
@@ -192,18 +156,26 @@ class ProductRAGWithEmbeddings:
 
 
 class ConversationalCrew:
+    """
+    BULLETPROOF version with complete initialization
+    """
+    
     def __init__(self, agents, products_json_path: str = "rproducts.json"):
         self.agents = agents
-        self.product_rag = ProductRAGWithEmbeddings(products_json_path)
+        self.product_rag = OptimizedProductRAG(products_json_path)
         
-        # Initialize embeddings at startup (one-time preprocessing)
-        print("\n" + "="*60)
-        print("INITIALIZING RAG SYSTEM")
-        print("="*60)
-        self.product_rag.generate_embeddings()
-        print("="*60 + "\n")
+        # Initialize with COMPLETE structure - all keys present
+        self.context = self._get_fresh_context()
         
-        self.context = {
+        self.genai_model = genai.GenerativeModel('gemini-2.5-flash-lite')
+        self.agent_tools = self._create_gemini_tools()
+    
+    def _get_fresh_context(self) -> dict:
+        """
+        Return a complete, fully initialized context structure
+        All keys present with default values
+        """
+        return {
             "conversation_history": [],
             "user_preferences": {},
             "products_mentioned": [],
@@ -220,12 +192,43 @@ class ConversationalCrew:
                 "interaction_count": 0
             }
         }
+    
+    def ensure_context_complete(self):
+        """
+        Ensure ALL required keys exist in context
+        Merge loaded session with fresh structure
+        """
+        fresh = self._get_fresh_context()
         
-        self.genai_model = genai.GenerativeModel('gemini-2.5-flash-lite')
-        self.agent_tools = self._create_gemini_tools()
+        # Ensure all top-level keys exist
+        for key, default_value in fresh.items():
+            if key not in self.context:
+                self.context[key] = default_value
+        
+        # Ensure session_metadata has all sub-keys
+        if "session_metadata" not in self.context:
+            self.context["session_metadata"] = fresh["session_metadata"]
+        else:
+            for key, default_value in fresh["session_metadata"].items():
+                if key not in self.context["session_metadata"]:
+                    self.context["session_metadata"][key] = default_value
+        
+        # Ensure customer_info exists
+        if "customer_info" not in self.context:
+            self.context["customer_info"] = {}
+        
+        # Ensure lists exist
+        for key in ["conversation_history", "products_mentioned", "cart_items", 
+                    "issues_reported", "recommendations_given", "transactions", "follow_ups"]:
+            if key not in self.context or not isinstance(self.context[key], list):
+                self.context[key] = []
+        
+        # Ensure loyalty_points is a number
+        if "loyalty_points" not in self.context or not isinstance(self.context["loyalty_points"], (int, float)):
+            self.context["loyalty_points"] = 0
 
     def _create_gemini_tools(self):
-        """Create Gemini function declarations for each agent"""
+        """Your original function declarations"""
         function_declarations = []
         
         for agent in self.agents:
@@ -281,7 +284,7 @@ class ConversationalCrew:
         return genai.protos.Tool(function_declarations=function_declarations)
 
     def _resolve_product_ids_from_names(self, names):
-        """Best-effort mapping of product names to product IDs."""
+        """Your original function"""
         resolved_ids = []
         if not names:
             return resolved_ids
@@ -303,10 +306,7 @@ class ConversationalCrew:
         return resolved_ids
     
     def _get_rag_context(self, user_input: str) -> str:
-        """
-        Get relevant products using RAG (with embeddings)
-        This now uses fast vector similarity instead of LLM inference
-        """
+        """Your original RAG logic"""
         recommendation_keywords = [
             'recommend', 'suggest', 'looking for', 'need', 'want', 
             'show me', 'find', 'search', 'buy', 'purchase', 'get'
@@ -316,7 +316,6 @@ class ConversationalCrew:
         is_recommendation_query = any(keyword in user_input_lower for keyword in recommendation_keywords)
         
         if is_recommendation_query:
-            # Use embedding-based search (FAST!)
             relevant_products = self.product_rag.search_products(user_input, top_k=5)
             
             if relevant_products:
@@ -325,25 +324,30 @@ class ConversationalCrew:
         return "No specific products retrieved for this query."
     
     def route_message(self, user_input):
-        """Single LLM call that decides agent AND generates response with RAG"""
+        """
+        Process message with SAFE context handling
+        """
         
-        # Update session metadata
+        # CRITICAL: Ensure context is complete before accessing
+        self.ensure_context_complete()
+        
+        # Update session metadata - now safe!
         if self.context["session_metadata"]["start_time"] is None:
             self.context["session_metadata"]["start_time"] = datetime.datetime.now().isoformat()
         
         self.context["session_metadata"]["last_interaction"] = datetime.datetime.now().isoformat()
         self.context["session_metadata"]["interaction_count"] += 1
         
-        # Build context summary
-        recent_history = self.context["conversation_history"][-5:]
+        # Get recent history (last 10 messages)
+        recent_history = self.context["conversation_history"][-10:]
         context_text = "\n".join(
             [f"User: {m['user']}\n{m['agent']}: {m['reply']}" for m in recent_history]
         ) if recent_history else "No previous conversation"
         
-        # Get RAG context using embedding-based retrieval
+        # Get RAG context
         rag_context = self._get_rag_context(user_input)
         
-        # Create comprehensive prompt
+        # YOUR ORIGINAL PROMPT - PRESERVED!
         prompt = f"""
 
 You are a multi-agent customer service system for an e-commerce platform.
@@ -378,12 +382,12 @@ Instructions:
 11. If the product is not in the database, apologize and suggest alternatives
 12. Make the user flow through the entire shopping process from greeting to purchase
 13. Purchase is not completed without payment
-14. If a product is not available, apologize and ask if the user would like to see some suggested items (suggest alternatives in the category ).
+14. If a product is not available, apologize and ask if the user would like to see some suggested items (suggest alternatives in the category).
 15. When modifying the cart, include cart_action (add/remove/clear/set) and cart_product_ids (IDs).
 """
         
         try:
-            # Single LLM call with function calling
+            # Call AI
             response = self.genai_model.generate_content(
                 contents=prompt,
                 tools=[self.agent_tools],
@@ -408,7 +412,7 @@ Instructions:
                     if "product_ids" in function_args:
                         product_ids = [int(pid) for pid in list(function_args["product_ids"])]
 
-                    # Extract and update context data
+                    # Cart update logic
                     cart_update = None
                     cart_action = function_args.get("cart_action")
                     cart_product_ids = []
@@ -453,6 +457,7 @@ Instructions:
                             "product_ids": cart_product_ids
                         }
                     
+                    # Update context
                     if "products_mentioned" in function_args:
                         new_products = list(function_args["products_mentioned"])
                         self.context["products_mentioned"].extend(new_products)
@@ -499,7 +504,10 @@ Instructions:
             return "Error Handler", error_msg, [], None
     
     def get_context_summary(self):
-        """Get a summary of all stored context data"""
+        """Your original summary"""
+        # Ensure context complete before summarizing
+        self.ensure_context_complete()
+        
         return {
             "total_interactions": self.context["session_metadata"]["interaction_count"],
             "session_start": self.context["session_metadata"]["start_time"],
@@ -514,6 +522,7 @@ Instructions:
         }
 
 
+# Your original agents
 class MeetingPrepAgents:
     Sales_Agent = Agent(
         role="Sales Specialist",
@@ -588,7 +597,7 @@ class MeetingPrepAgents:
     )
 
 
-# Create the conversational crew with embedding-based RAG
+# Create the crew
 crew = ConversationalCrew(
     agents=[
         MeetingPrepAgents.Sales_Agent,
@@ -605,6 +614,8 @@ crew = ConversationalCrew(
     products_json_path="rproducts.json"
 )
 
-print("\n### CrewAI with Embedding-Based RAG ###")
+print("\n### BULLETPROOF CrewAI System ###")
 print(f"✓ System ready with {len(crew.product_rag.products)} products")
+print("✓ All context keys initialized")
+print("✓ Safe from KeyErrors")
 print("Type 'exit' to quit, 'summary' to see context summary.\n")

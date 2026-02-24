@@ -449,19 +449,30 @@
         </div>
         
         <!-- Wishlist Button -->
-        <button onclick="toggleWishlist()" class="relative p-2 hover:bg-gray-100 rounded-lg transition text-gray-600 hover:text-gray-900">
+        <button onclick="toggleWishlist()" class="relative p-2 hover:bg-gray-100 rounded-lg transition text-gray-600 hover:text-gray-900"
+                title="Wishlist">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
           </svg>
           <span id="wishlistBadge" class="badge bg-red-500 text-white" style="display: none;">0</span>
         </button>
-        
+
         <!-- Cart Button -->
-        <button onclick="toggleCart()" class="relative p-2 hover:bg-gray-100 rounded-lg transition text-gray-600 hover:text-gray-900">
+        <button onclick="toggleCart()" class="relative p-2 hover:bg-gray-100 rounded-lg transition text-gray-600 hover:text-gray-900"
+                title="Cart">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path>
           </svg>
           <span id="cartBadge" class="badge bg-gray-900 text-white" style="display: none;">0</span>
+        </button>
+
+        <!-- History Button -->
+        <button onclick="toggleHistory()" class="relative p-2 hover:bg-gray-100 rounded-lg transition text-gray-600 hover:text-gray-900"
+                title="Chat History">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          <span id="historyBadge" class="badge bg-indigo-500 text-white" style="display: none;">0</span>
         </button>
         
         <a href="/profile" class="p-2 hover:bg-gray-100 rounded-lg transition text-gray-600 hover:text-gray-900">
@@ -560,6 +571,24 @@
         Proceed to Checkout
       </button>
     </div>
+  </div>
+
+  <!-- History Side Panel -->
+  <div id="historyPanel" class="side-panel fixed top-0 right-0 h-full w-full sm:w-[28rem] bg-white z-50 transform translate-x-full flex flex-col">
+    <div class="flex items-center justify-between p-4 border-b">
+      <h2 class="text-xl font-bold text-gray-900 flex items-center gap-2">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+        Chat History
+      </h2>
+      <button onclick="toggleHistory()" class="p-2 hover:bg-gray-100 rounded-lg transition">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
+    </div>
+    <div id="historyItems" class="flex-1 overflow-y-auto p-4 space-y-4"></div>
   </div>
 
   <!-- Wishlist Side Panel -->

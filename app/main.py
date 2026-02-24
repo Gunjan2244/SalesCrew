@@ -1,8 +1,16 @@
+"""
+FINAL CORRECTED Main.py - With proper error handling
+- Handles missing keys in loaded sessions
+- Initializes customer_info safely
+- Works with CORRECTED_crew_backend.py
+"""
+
 from fastapi import FastAPI, WebSocket, Request, Depends, HTTPException, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.security import HTTPBearer
+from starlette.websockets import WebSocketDisconnect, WebSocketState
 from jose import jwt, JWTError
 from auth import SECRET_KEY, ALGORITHM
 from pydantic import BaseModel
@@ -108,6 +116,9 @@ class ProfileUpdate(BaseModel):
     zipcode: Optional[str] = None
     country: Optional[str] = None
 
+class ProductBatchRequest(BaseModel):
+    ids: list[int]
+
 
 @app.put("/api/update-profile")
 async def update_profile(
@@ -165,6 +176,20 @@ async def get_product(product_id: int):
             return product
     raise HTTPException(status_code=404, detail="Product not found")
 
+@app.post("/api/products/batch")
+async def get_products_batch(payload: ProductBatchRequest):
+    """Get multiple product details by IDs (preserve input order)"""
+    if not payload.ids:
+        return []
+
+    products_by_id = {p.get("id"): p for p in crew.product_rag.products}
+    result = []
+    for product_id in payload.ids:
+        product = products_by_id.get(product_id)
+        if product:
+            result.append(product)
+    return result
+
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
@@ -173,10 +198,13 @@ async def websocket_endpoint(websocket: WebSocket):
     
     try:
         # Wait for authentication message with timeout
-        auth_message = await asyncio.wait_for(
-            websocket.receive_text(), 
-            timeout=10.0
-        )
+        try:
+            auth_message = await asyncio.wait_for(
+                websocket.receive_text(), 
+                timeout=10.0
+            )
+        except WebSocketDisconnect:
+            return
         
         try:
             auth_data = json.loads(auth_message)
@@ -242,9 +270,14 @@ async def websocket_endpoint(websocket: WebSocket):
         saved_session = await load_user_session(user_email)
         
         if saved_session:
-            # Restore context for this user
+            # Restore context - with safe fallbacks for missing keys
             crew.context = saved_session
-            # Update customer info with current user details
+            
+            # Ensure customer_info exists
+            if "customer_info" not in crew.context:
+                crew.context["customer_info"] = {}
+            
+            # Update/set customer info
             crew.context["customer_info"]["name"] = user_name
             crew.context["customer_info"]["email"] = user_email
             crew.context["customer_info"]["phone"] = user.get("phone", "")
@@ -262,6 +295,10 @@ async def websocket_endpoint(websocket: WebSocket):
             }))
         else:
             # Initialize new session with user info
+            # Ensure customer_info exists
+            if "customer_info" not in crew.context:
+                crew.context["customer_info"] = {}
+                
             crew.context["customer_info"]["name"] = user_name
             crew.context["customer_info"]["email"] = user_email
             crew.context["customer_info"]["phone"] = user.get("phone", "")
@@ -284,7 +321,10 @@ async def websocket_endpoint(websocket: WebSocket):
         # Main message loop
         while True:
             try:
-                user_msg = await websocket.receive_text()
+                try:
+                    user_msg = await websocket.receive_text()
+                except WebSocketDisconnect:
+                    break
                 
                 if user_msg.lower() in ["exit", "quit"]:
                     # Save session before closing
@@ -330,7 +370,8 @@ async def websocket_endpoint(websocket: WebSocket):
                     "message": f"⚠️ Error: {str(e)}",
                     "product_ids": []
                 }
-                await websocket.send_text(json.dumps(error_data))
+                if websocket.client_state == WebSocketState.CONNECTED:
+                    await websocket.send_text(json.dumps(error_data))
                 break
         
     except asyncio.TimeoutError:
@@ -357,7 +398,8 @@ async def websocket_endpoint(websocket: WebSocket):
                 "message": f"⚠️ Connection error: {str(e)}",
                 "product_ids": []
             }
-            await websocket.send_text(json.dumps(error_data))
+            if websocket.client_state == WebSocketState.CONNECTED:
+                await websocket.send_text(json.dumps(error_data))
         except:
             pass
         
@@ -370,6 +412,19 @@ async def websocket_endpoint(websocket: WebSocket):
             await websocket.close()
         except:
             pass
+
+
+@app.get("/api/history")
+async def get_history(current_user: dict = Depends(get_current_user)):
+    """Get conversation history for authenticated user"""
+    email = current_user["email"]
+    saved_session = await load_user_session(email)
+    if not saved_session:
+        return {"history": []}
+    history = saved_session.get("conversation_history", [])
+    # Return last 50 turns
+    return {"history": history[-50:]}
+
 
 @app.get("/api/summary")
 async def get_summary(current_user: dict = Depends(get_current_user)):
